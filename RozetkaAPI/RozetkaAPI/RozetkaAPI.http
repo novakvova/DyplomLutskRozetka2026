@@ -1,6 +1,29 @@
 @RozetkaAPI_HostAddress = http://localhost:5224
 
-GET {{RozetkaAPI_HostAddress}}/weatherforecast/
-Accept: application/json
+### Реєстрація
+POST {{RozetkaAPI_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "new.buyer@rozetka.test",
+  "password": "Buyer12345",
+  "firstName": "Марко",
+  "lastName": "Шевчук",
+  "phone": "+380671112233"
+}
+
+### Вхід
+# @name login
+POST {{RozetkaAPI_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "buyer@rozetka.test",
+  "password": "Buyer12345"
+}
+
+### Профіль
+GET {{RozetkaAPI_HostAddress}}/api/profile
+Authorization: Bearer {{login.response.body.$.accessToken}}
 
 ###

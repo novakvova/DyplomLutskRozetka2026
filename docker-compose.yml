@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rozetka
+      POSTGRES_PASSWORD: rozetka
+      POSTGRES_DB: rozetka
+    ports:
+      - "5432:5432"
+    volumes:
+      - rozetka-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rozetka -d rozetka"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./RozetkaAPI
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: Host=db;Port=5432;Database=rozetka;Username=rozetka;Password=rozetka
+      Auth__ExposeResetLink: "true"
+      Auth__FrontendUrl: http://localhost:43123
+    ports:
+      - "5224:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  rozetka-pg:
