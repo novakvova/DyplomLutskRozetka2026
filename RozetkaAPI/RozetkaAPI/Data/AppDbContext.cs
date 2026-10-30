@@ -7,6 +7,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<Category> Categories => Set<Category>(); // Додали Categories
     public DbSet<Product> Products => Set<Product>();
     public DbSet<CartItem> CartItems => Set<CartItem>();
     public DbSet<Favorite> Favorites => Set<Favorite>();
@@ -38,11 +39,25 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // Налаштування Category
+        modelBuilder.Entity<Category>(entity =>
+        {
+            entity.Property(c => c.Name).HasMaxLength(100);
+            entity.Property(c => c.Description).HasMaxLength(500);
+        });
+
+        // Налаштування Product та зв'язку з Category
         modelBuilder.Entity<Product>(entity =>
         {
             entity.Property(product => product.Name).HasMaxLength(160);
             entity.Property(product => product.ShortDescription).HasMaxLength(1000);
             entity.Property(product => product.Price).HasPrecision(12, 2);
+
+            // Зв'язок із категорією
+            entity.HasOne(product => product.Category)
+                .WithMany(category => category.Products)
+                .HasForeignKey(product => product.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<CartItem>(entity =>
@@ -82,10 +97,4 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<Review>(entity =>
         {
-            entity.Property(review => review.Text).HasMaxLength(1000);
-            entity.HasIndex(review => new { review.UserId, review.ProductId }).IsUnique();
-            entity.HasOne(review => review.User).WithMany().HasForeignKey(review => review.UserId).OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(review => review.Product).WithMany().HasForeignKey(review => review.ProductId).OnDelete(DeleteBehavior.Cascade);
-        });
-    }
-}
+        entity
