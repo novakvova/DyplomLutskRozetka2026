@@ -20,8 +20,10 @@ public class UsersController(AppDbContext context) : ControllerBase
                 Email = u.Email,
                 FirstName = u.FirstName,
                 LastName = u.LastName,
-                Phone = u.Phone
-                // Пароль або чутливі дані не повертаємо
+                Phone = u.Phone,
+                Role = u.Role,
+                IsBlocked = u.IsBlocked,
+                CreatedAt = u.CreatedAt
             })
             .ToListAsync();
     }
@@ -43,7 +45,28 @@ public class UsersController(AppDbContext context) : ControllerBase
             Email = user.Email,
             FirstName = user.FirstName,
             LastName = user.LastName,
-            Phone = user.Phone
+            Phone = user.Phone,
+            Role = user.Role,
+            IsBlocked = user.IsBlocked,
+            CreatedAt = user.CreatedAt
         };
+    }
+
+    // PATCH: api/users/5/block (Блокування / розблокування користувача)
+    [HttpPatch("{id}/block")]
+    public async Task<IActionResult> ToggleBlockUser(int id)
+    {
+        var user = await context.Users.FindAsync(id);
+
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        // Інвертуємо статус блокування
+        user.IsBlocked = !user.IsBlocked;
+        await context.SaveChangesAsync();
+
+        return NoContent();
     }
 }
