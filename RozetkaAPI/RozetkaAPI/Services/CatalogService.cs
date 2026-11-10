@@ -62,4 +62,36 @@ public class CatalogService(AppDbContext db)
             reviews.FirstOrDefault(review => review.IsMine),
             reviews);
     }
+
+    // --- Методи для адмін-панелі (Створення, Оновлення, Видалення) ---
+
+    public async Task<int> CreateAsync(Product request, CancellationToken cancellationToken)
+    {
+        db.Products.Add(request);
+        await db.SaveChangesAsync(cancellationToken);
+        return request.Id;
+    }
+
+    public async Task UpdateAsync(int productId, Product request, CancellationToken cancellationToken)
+    {
+        var product = await db.Products.SingleOrDefaultAsync(item => item.Id == productId, cancellationToken)
+            ?? throw new AppException(StatusCodes.Status404NotFound, "Товар не знайдено.");
+
+        product.Name = request.Name;
+        product.ShortDescription = request.ShortDescription;
+        product.Price = request.Price;
+        product.Stock = request.Stock;
+        product.CategoryId = request.CategoryId;
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteAsync(int productId, CancellationToken cancellationToken)
+    {
+        var product = await db.Products.SingleOrDefaultAsync(item => item.Id == productId, cancellationToken)
+            ?? throw new AppException(StatusCodes.Status404NotFound, "Товар не знайдено.");
+
+        db.Products.Remove(product);
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }
