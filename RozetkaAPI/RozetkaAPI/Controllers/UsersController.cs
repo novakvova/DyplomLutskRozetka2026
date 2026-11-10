@@ -54,7 +54,7 @@ public class UsersController(AppDbContext context) : ControllerBase
 
     // PATCH: api/users/5/block (Блокування / розблокування користувача)
     [HttpPatch("{id}/block")]
-    public async Task<IActionResult> ToggleBlockUser(int id)
+        public async Task<IActionResult> ToggleBlockUser(int id)
     {
         var user = await context.Users.FindAsync(id);
 
