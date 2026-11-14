@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="RozetkaAPI/RozetkaAPI.csproj" />
+  <Project Path="RozetkaAPI.Tests/RozetkaAPI.Tests.csproj" />
 </Solution>

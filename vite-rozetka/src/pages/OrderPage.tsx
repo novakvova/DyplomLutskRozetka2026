@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api'
-import { ErrorText } from '../components/Field'
+import { Button, ErrorText } from '../components/Field'
 import { deliveryLabel, formatDate, formatMoney, orderStatusLabel, paymentLabel } from '../lib/format'
 import type { Order } from '../types'
 
@@ -9,6 +9,7 @@ export function OrderPage() {
   const { id } = useParams()
   const [order, setOrder] = useState<Order | null>(null)
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     api<Order>(`/api/orders/${id}`)
@@ -20,6 +21,21 @@ export function OrderPage() {
     return <ErrorText>{error}</ErrorText>
   if (!order)
     return <p className="text-stone-600">Завантаження…</p>
+
+  const current = order
+  const canCancel = current.status === 'New' || current.status === 'AwaitingPayment'
+
+  async function cancel() {
+    setBusy(true)
+    setError('')
+    try {
+      setOrder(await api<Order>(`/api/orders/${current.id}/cancel`, { method: 'POST' }))
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : 'Не вдалося скасувати замовлення.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <section className="max-w-2xl space-y-4">
@@ -41,6 +57,10 @@ export function OrderPage() {
         ))}
       </ul>
       <p className="text-xl font-semibold">Разом {formatMoney(order.total)}</p>
+      {canCancel ? (
+        <Button type="button" disabled={busy} onClick={() => void cancel()}>Скасувати замовлення</Button>
+      ) : null}
+      <ErrorText>{error}</ErrorText>
     </section>
   )
 }

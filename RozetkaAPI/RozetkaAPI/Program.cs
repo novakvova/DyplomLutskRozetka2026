@@ -32,11 +32,18 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     };
 });
 
-var connectionString = builder.Configuration.GetConnectionString("Default")
-    ?? throw new InvalidOperationException("У конфігурації немає рядка підключення Default.");
-builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+var sqlite = builder.Configuration["Database:Sqlite"];
+if (!string.IsNullOrWhiteSpace(sqlite))
+    builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(sqlite));
+else
+{
+    var connectionString = builder.Configuration.GetConnectionString("Default")
+        ?? throw new InvalidOperationException("У конфігурації немає рядка підключення Default.");
+    builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+}
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddSingleton<ResetMailer>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<CartService>();
@@ -140,6 +147,9 @@ app.Run();
 
 static async Task MigrateAndSeedAsync(WebApplication app)
 {
+    if (!app.Configuration.GetValue("Database:ApplyMigrations", true))
+        return;
+
     const int attempts = 10;
     for (var attempt = 1; attempt <= attempts; attempt++)
     {
