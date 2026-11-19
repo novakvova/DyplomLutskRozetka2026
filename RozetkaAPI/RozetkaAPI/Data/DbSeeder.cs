@@ -14,8 +14,15 @@ public static class DbSeeder
         if (!await db.Users.AnyAsync())
         {
             db.Users.AddRange(
-                CreateUser(hasher, "buyer@rozetka.test", "Buyer12345", "Олена", "Коваль", "+380501112233", false),
-                CreateUser(hasher, "blocked@rozetka.test", "Blocked12345", "Ігор", "Блок", null, true));
+                CreateUser(hasher, "buyer@rozetka.test", "Buyer12345", "Олена", "Коваль", "+380501112233", UserRole.Buyer, false),
+                CreateUser(hasher, "blocked@rozetka.test", "Blocked12345", "Ігор", "Блок", null, UserRole.Buyer, true));
+            await db.SaveChangesAsync();
+        }
+
+        if (!await db.Users.AnyAsync(user => user.Role == UserRole.Admin)
+            && !await db.Users.AnyAsync(user => user.Email == "admin@rozetka.test"))
+        {
+            db.Users.Add(CreateUser(hasher, "admin@rozetka.test", "Admin12345", "Адмін", "Магазину", null, UserRole.Admin, false));
             await db.SaveChangesAsync();
         }
 
@@ -91,6 +98,7 @@ public static class DbSeeder
         string firstName,
         string lastName,
         string? phone,
+        UserRole role,
         bool isBlocked)
     {
         var user = new User
@@ -99,7 +107,7 @@ public static class DbSeeder
             FirstName = firstName,
             LastName = lastName,
             Phone = phone,
-            Role = UserRole.Buyer,
+            Role = role,
             IsBlocked = isBlocked,
             CreatedAt = DateTime.UtcNow
         };

@@ -1,6 +1,8 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { Layout } from './components/Layout'
+import { AdminLayout } from './components/AdminLayout'
+import { RequireAdmin } from './components/RequireAdmin'
 import { RequireAuth } from './components/RequireAuth'
 import { CartPage } from './pages/CartPage'
 import { CatalogPage } from './pages/CatalogPage'
@@ -15,6 +17,9 @@ import { ProductPage } from './pages/ProductPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
+import { AdminOrdersPage } from './pages/admin/AdminOrdersPage'
+import { AdminProductsPage } from './pages/admin/AdminProductsPage'
+import { AdminUsersPage } from './pages/admin/AdminUsersPage'
 
 export default function App() {
   return (
@@ -35,6 +40,13 @@ export default function App() {
               <Route path="orders" element={<OrdersPage />} />
               <Route path="orders/:id" element={<OrderPage />} />
               <Route path="profile" element={<ProfilePage />} />
+            </Route>
+            <Route element={<RequireAdmin />}>
+              <Route path="admin" element={<AdminLayout />}>
+                <Route index element={<AdminProductsPage />} />
+                <Route path="orders" element={<AdminOrdersPage />} />
+                <Route path="users" element={<AdminUsersPage />} />
+              </Route>
             </Route>
             <Route path="*" element={<NotFoundPage />} />
           </Route>

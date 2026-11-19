@@ -66,6 +66,37 @@ public record CheckoutRequest(
 
 public record OrderItemResponse(int ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal);
 
+public record SaveProductRequest(string Name, string ShortDescription, decimal Price, int Stock);
+
+public record SetOrderStatusRequest(OrderStatus Status);
+
+public record AdminOrderResponse(
+    int Id,
+    DateTime CreatedAt,
+    OrderStatus Status,
+    string UserEmail,
+    string RecipientName,
+    string Phone,
+    string City,
+    string DeliveryMethod,
+    string DeliveryAddress,
+    string PaymentMethod,
+    string? Comment,
+    decimal Total,
+    IReadOnlyList<OrderItemResponse> Items);
+
+public record AdminUserResponse(
+    int Id,
+    string Email,
+    string FirstName,
+    string LastName,
+    string? Phone,
+    string Role,
+    bool IsBlocked,
+    DateTime CreatedAt);
+
+public record SetUserBlockedRequest(bool IsBlocked);
+
 public record OrderResponse(
     int Id,
     DateTime CreatedAt,

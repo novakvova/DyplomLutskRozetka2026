@@ -50,6 +50,7 @@ builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<FavoriteService>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<ReviewService>();
+builder.Services.AddScoped<AdminService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("У конфігурації немає Jwt:Key.");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
