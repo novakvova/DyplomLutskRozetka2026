@@ -15,6 +15,7 @@ public class AuthService(
     IPasswordHasher<User> hasher,
     TokenService tokens,
     IConfiguration configuration,
+    ResetMailer mailer,
     ILogger<AuthService> logger)
 {
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken)
@@ -115,7 +116,7 @@ public class AuthService(
 
     public async Task<MessageResponse> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken)
     {
-        const string generic = "Якщо обліковий запис існує, ми підготували посилання для нового пароля.";
+        const string generic = "Якщо обліковий запис існує, ми надіслали лист із посиланням для нового пароля.";
         var email = InputRules.Email(request.Email);
         var user = await db.Users.SingleOrDefaultAsync(item => item.Email == email, cancellationToken);
         if (user is null || user.IsBlocked || user.PasswordHash is null)
@@ -141,9 +142,17 @@ public class AuthService(
 
         var frontend = configuration["Auth:FrontendUrl"] ?? "http://localhost:43123";
         var resetUrl = $"{frontend.TrimEnd('/')}/reset-password?token={Uri.EscapeDataString(rawToken)}";
+        if (mailer.IsConfigured)
+        {
+            await mailer.SendAsync(user.Email, resetUrl, cancellationToken);
+            return new MessageResponse(generic);
+        }
+
         var expose = configuration.GetValue("Auth:ExposeResetLink", false);
         if (expose)
             logger.LogInformation("Посилання для відновлення пароля {Email}: {ResetUrl}", user.Email, resetUrl);
+        else
+            logger.LogWarning("SMTP не налаштований, лист для {Email} не надіслано.", user.Email);
 
         return new MessageResponse(generic, expose ? resetUrl : null);
     }

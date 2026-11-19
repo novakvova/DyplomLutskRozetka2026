@@ -22,4 +22,8 @@ public class OrdersController(OrderService orders) : ControllerBase
     [HttpPost]
     public async Task<OrderResponse> Checkout(CheckoutRequest request, CancellationToken cancellationToken) =>
         await orders.CheckoutAsync(CurrentUser.Id(User), request, cancellationToken);
+
+    [HttpPost("{id:int}/cancel")]
+    public async Task<OrderResponse> Cancel(int id, CancellationToken cancellationToken) =>
+        await orders.CancelAsync(CurrentUser.Id(User), id, cancellationToken);
 }

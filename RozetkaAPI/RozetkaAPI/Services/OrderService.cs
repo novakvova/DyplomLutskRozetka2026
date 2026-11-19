@@ -90,6 +90,33 @@ public class OrderService(AppDbContext db)
         return Map(order);
     }
 
+    public async Task<OrderResponse> CancelAsync(int userId, int orderId, CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var order = await db.Orders
+            .Include(item => item.Items)
+            .SingleOrDefaultAsync(item => item.Id == orderId && item.UserId == userId, cancellationToken)
+            ?? throw new AppException(StatusCodes.Status404NotFound, "Замовлення не знайдено.");
+
+        if (order.Status is not (OrderStatus.New or OrderStatus.AwaitingPayment))
+            throw new AppException(StatusCodes.Status400BadRequest, "Це замовлення вже не можна скасувати.");
+
+        var productIds = order.Items.Select(item => item.ProductId).Distinct().ToList();
+        var products = await db.Products
+            .Where(product => productIds.Contains(product.Id))
+            .ToDictionaryAsync(product => product.Id, cancellationToken);
+        foreach (var item in order.Items)
+        {
+            if (products.TryGetValue(item.ProductId, out var product))
+                product.Stock += item.Quantity;
+        }
+
+        order.Status = OrderStatus.Cancelled;
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Map(order);
+    }
+
     private IQueryable<CustomerOrder> Query(int userId) =>
         db.Orders.Include(order => order.Items).Where(order => order.UserId == userId).OrderByDescending(order => order.CreatedAt);
 
