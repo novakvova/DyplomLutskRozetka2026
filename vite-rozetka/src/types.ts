@@ -76,6 +76,21 @@ export type OrderItem = {
   lineTotal: number
 }
 
+export type AdminOrder = Order & {
+  userEmail: string
+}
+
+export type AdminUser = {
+  id: number
+  email: string
+  firstName: string
+  lastName: string
+  phone: string | null
+  role: string
+  isBlocked: boolean
+  createdAt: string
+}
+
 export type Order = {
   id: number
   createdAt: string

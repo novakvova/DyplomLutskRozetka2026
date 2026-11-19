@@ -53,6 +53,7 @@ export function Layout() {
                 <NavLink to="/favorites" className={linkClass}>Обране</NavLink>
                 <NavLink to="/orders" className={linkClass}>Замовлення</NavLink>
                 <NavLink to="/profile" className={linkClass}>Профіль</NavLink>
+                {user.role === 'Admin' ? <NavLink to="/admin" className={linkClass}>Адмінка</NavLink> : null}
               </>
             )}
           </nav>
