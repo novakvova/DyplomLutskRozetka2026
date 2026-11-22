@@ -9,7 +9,16 @@ public record ProductListItemResponse(
     decimal Price,
     int Stock,
     double? AverageRating,
-    int ReviewCount);
+    int ReviewCount,
+    int CategoryId,
+    string CategoryName,
+    string? ImageUrl);
+
+public record CharacteristicResponse(string Name, string Value);
+
+public record CategoryResponse(int Id, string Name);
+
+public record SaveCategoryRequest(string Name);
 
 public record ReviewResponse(
     int Id,
@@ -30,7 +39,14 @@ public record ProductDetailsResponse(
     bool IsFavorite,
     int CartQuantity,
     ReviewResponse? MyReview,
-    IReadOnlyList<ReviewResponse> Reviews);
+    IReadOnlyList<ReviewResponse> Reviews,
+    string FullDescription,
+    string? ManufacturerUrl,
+    int CategoryId,
+    string CategoryName,
+    IReadOnlyList<string> Images,
+    IReadOnlyList<CharacteristicResponse> Characteristics,
+    bool CanReview);
 
 public record UpsertReviewRequest(int Rating, string Text);
 
@@ -53,7 +69,8 @@ public record FavoriteResponse(
     string Name,
     string ShortDescription,
     decimal Price,
-    int Stock);
+    int Stock,
+    string? ImageUrl);
 
 public record FavoriteRequest(int ProductId);
 
@@ -68,7 +85,38 @@ public record CheckoutRequest(
 
 public record OrderItemResponse(int ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal);
 
-public record SaveProductRequest(string Name, string ShortDescription, decimal Price, int Stock);
+public record CharacteristicInput(string Name, string Value);
+
+public record SaveProductRequest(
+    string Name,
+    string ShortDescription,
+    string? FullDescription,
+    decimal Price,
+    int Stock,
+    int CategoryId,
+    string? ManufacturerUrl,
+    IReadOnlyList<string>? ImageUrls,
+    IReadOnlyList<CharacteristicInput>? Characteristics);
+
+public record AdminProductResponse(
+    int Id,
+    string Name,
+    string ShortDescription,
+    string FullDescription,
+    decimal Price,
+    int Stock,
+    int CategoryId,
+    string? ManufacturerUrl,
+    IReadOnlyList<string> ImageUrls,
+    IReadOnlyList<CharacteristicInput> Characteristics);
+
+public record UploadedFileResponse(string Url);
+
+public record CityResponse(string Ref, string Name);
+
+public record WarehouseResponse(string Ref, string Name);
+
+public record PaymentStartResponse(string Mode, string Message, string? Data, string? Signature, OrderResponse? Order);
 
 public record SetOrderStatusRequest(OrderStatus Status);
 

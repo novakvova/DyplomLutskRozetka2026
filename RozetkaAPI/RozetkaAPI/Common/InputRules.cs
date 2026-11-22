@@ -67,4 +67,22 @@ public static class InputRules
 
         return text;
     }
+
+    public static string OptionalText(string? value, string label, int max)
+    {
+        var text = value?.Trim() ?? "";
+        if (text.Length > max)
+            throw new AppException(StatusCodes.Status400BadRequest, $"{label} має містити до {max} символів.");
+        return text;
+    }
+
+    public static string? WebAddress(string? value)
+    {
+        var text = value?.Trim() ?? "";
+        if (text.Length == 0)
+            return null;
+        if (text.Length > 300 || !Uri.TryCreate(text, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
+            throw new AppException(StatusCodes.Status400BadRequest, "Посилання на сайт виробника має починатися з http:// або https://.");
+        return text;
+    }
 }

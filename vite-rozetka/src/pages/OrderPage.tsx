@@ -3,13 +3,15 @@ import { Link, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api'
 import { Button, ErrorText } from '../components/Field'
 import { deliveryLabel, formatDate, formatMoney, orderStatusLabel, paymentLabel } from '../lib/format'
-import type { Order } from '../types'
+import type { Order, PaymentStart } from '../types'
 
 export function OrderPage() {
   const { id } = useParams()
   const [order, setOrder] = useState<Order | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [payMessage, setPayMessage] = useState('')
+  const [liqpay, setLiqpay] = useState<PaymentStart | null>(null)
 
   useEffect(() => {
     api<Order>(`/api/orders/${id}`)
@@ -37,6 +39,24 @@ export function OrderPage() {
     }
   }
 
+  async function pay() {
+    setBusy(true)
+    setError('')
+    setPayMessage('')
+    try {
+      const started = await api<PaymentStart>(`/api/orders/${current.id}/pay`, { method: 'POST' })
+      setPayMessage(started.message)
+      if (started.mode === 'liqpay')
+        setLiqpay(started)
+      if (started.order)
+        setOrder(started.order)
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : 'Не вдалося почати оплату.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <section className="max-w-2xl space-y-4">
       <Link to="/orders" className="text-sm text-brand-800">До списку замовлень</Link>
@@ -57,6 +77,17 @@ export function OrderPage() {
         ))}
       </ul>
       <p className="text-xl font-semibold">Разом {formatMoney(order.total)}</p>
+      {current.status === 'AwaitingPayment' ? (
+        <Button type="button" disabled={busy} onClick={() => void pay()}>Оплатити карткою</Button>
+      ) : null}
+      {liqpay?.data && liqpay.signature ? (
+        <form action="https://www.liqpay.ua/api/3/checkout" method="POST">
+          <input type="hidden" name="data" value={liqpay.data} />
+          <input type="hidden" name="signature" value={liqpay.signature} />
+          <Button type="submit">Перейти до LiqPay</Button>
+        </form>
+      ) : null}
+      {payMessage ? <p className="text-sm text-stone-600">{payMessage}</p> : null}
       {canCancel ? (
         <Button type="button" disabled={busy} onClick={() => void cancel()}>Скасувати замовлення</Button>
       ) : null}

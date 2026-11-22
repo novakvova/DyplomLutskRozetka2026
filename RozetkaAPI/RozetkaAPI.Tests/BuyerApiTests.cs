@@ -96,6 +96,57 @@ public class BuyerApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Price_filter_hides_products_outside_the_range()
+    {
+        await AuthorizedClientWithProduct("filter@example.com", stock: 3);
+        var matched = await _client.GetFromJsonAsync<List<ProductJson>>("/api/products?query=Тестовий&minPrice=100&maxPrice=100");
+        Assert.NotEmpty(matched!);
+        var none = await _client.GetFromJsonAsync<List<ProductJson>>("/api/products?query=Тестовий&maxPrice=10");
+        Assert.Empty(none!);
+    }
+
+    [Fact]
+    public async Task Review_needs_a_purchase_and_demo_card_payment_is_explicit()
+    {
+        var (client, productId) = await AuthorizedClientWithProduct("pay@example.com", stock: 4);
+        var tooEarly = await client.PostAsJsonAsync($"/api/products/{productId}/reviews", new
+        {
+            rating = 5,
+            text = "Дуже хороший товар для дому"
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, tooEarly.StatusCode);
+
+        await SetCart(client, productId, 1);
+        var orderResponse = await client.PostAsJsonAsync("/api/orders", new
+        {
+            recipientName = "Олена Коваль",
+            phone = "+380671234567",
+            city = "Луцьк",
+            deliveryMethod = "nova_poshta",
+            deliveryAddress = "Відділення 3",
+            paymentMethod = "card"
+        });
+        var order = await orderResponse.Content.ReadFromJsonAsync<OrderBody>();
+        Assert.Equal("AwaitingPayment", order!.Status);
+
+        var pay = await client.PostAsync($"/api/orders/{order.Id}/pay", null);
+        Assert.Equal(HttpStatusCode.OK, pay.StatusCode);
+        var paid = await pay.Content.ReadFromJsonAsync<PaymentJson>();
+        Assert.Equal("demo", paid!.Mode);
+        Assert.Equal("Processing", paid.Order!.Status);
+
+        var review = await client.PostAsJsonAsync($"/api/products/{productId}/reviews", new
+        {
+            rating = 5,
+            text = "Дуже хороший товар для дому"
+        });
+        Assert.Equal(HttpStatusCode.OK, review.StatusCode);
+
+        var cities = await _client.GetFromJsonAsync<List<CityJson>>("/api/delivery/cities?query=Луц");
+        Assert.Contains(cities!, city => city.Name == "Луцьк");
+    }
+
+    [Fact]
     public async Task Checkout_reduces_stock_and_cancel_returns_it()
     {
         var (client, productId) = await AuthorizedClientWithProduct("stock@example.com", stock: 2);
@@ -147,10 +198,15 @@ public class BuyerApiTests : IAsyncLifetime
         using (var scope = _factory.Services.CreateScope())
         {
             var database = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var category = await database.Categories.FirstOrDefaultAsync()
+                ?? database.Categories.Add(new Category { Name = "Тестова категорія" }).Entity;
+            await database.SaveChangesAsync();
             var product = new Product
             {
+                CategoryId = category.Id,
                 Name = "Тестовий товар",
                 ShortDescription = "Для перевірки складу",
+                FullDescription = "Повний опис тестового товару для каталогу.",
                 Price = 100,
                 Stock = stock,
                 CreatedAt = DateTime.UtcNow
@@ -207,6 +263,8 @@ public class BuyerApiTests : IAsyncLifetime
     private sealed record CartBody(List<CartLineBody> Items);
     private sealed record CartLineBody(int Quantity);
     private sealed record ProductJson(int Id, string Name);
+    private sealed record PaymentJson(string Mode, OrderBody? Order);
+    private sealed record CityJson(string Name);
 }
 
 public sealed class ApiFactory : WebApplicationFactory<Program>

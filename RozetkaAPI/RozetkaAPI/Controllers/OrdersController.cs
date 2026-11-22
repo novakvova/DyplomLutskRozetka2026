@@ -26,4 +26,8 @@ public class OrdersController(OrderService orders) : ControllerBase
     [HttpPost("{id:int}/cancel")]
     public async Task<OrderResponse> Cancel(int id, CancellationToken cancellationToken) =>
         await orders.CancelAsync(CurrentUser.Id(User), id, cancellationToken);
+
+    [HttpPost("{id:int}/pay")]
+    public async Task<PaymentStartResponse> Pay(int id, CancellationToken cancellationToken) =>
+        await orders.PayAsync(CurrentUser.Id(User), id, cancellationToken);
 }

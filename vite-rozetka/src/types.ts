@@ -26,6 +26,32 @@ export type Product = {
   stock: number
   averageRating: number | null
   reviewCount: number
+  categoryId: number
+  categoryName: string
+  imageUrl: string | null
+}
+
+export type Characteristic = {
+  name: string
+  value: string
+}
+
+export type Category = {
+  id: number
+  name: string
+}
+
+export type AdminProduct = {
+  id: number
+  name: string
+  shortDescription: string
+  fullDescription: string
+  price: number
+  stock: number
+  categoryId: number
+  manufacturerUrl: string | null
+  imageUrls: string[]
+  characteristics: Characteristic[]
 }
 
 export type Review = {
@@ -42,6 +68,11 @@ export type ProductDetails = Product & {
   cartQuantity: number
   myReview: Review | null
   reviews: Review[]
+  fullDescription: string
+  manufacturerUrl: string | null
+  images: string[]
+  characteristics: Characteristic[]
+  canReview: boolean
 }
 
 export type CartLine = {
@@ -64,6 +95,25 @@ export type Favorite = {
   shortDescription: string
   price: number
   stock: number
+  imageUrl: string | null
+}
+
+export type City = {
+  ref: string
+  name: string
+}
+
+export type Warehouse = {
+  ref: string
+  name: string
+}
+
+export type PaymentStart = {
+  mode: 'demo' | 'liqpay'
+  message: string
+  data: string | null
+  signature: string | null
+  order: Order | null
 }
 
 export type OrderStatus = 'New' | 'AwaitingPayment' | 'Processing' | 'Completed' | 'Cancelled'
