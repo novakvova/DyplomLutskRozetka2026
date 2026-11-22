@@ -73,6 +73,9 @@ public class AdminApiTests : IAsyncLifetime
         var order = await orderResponse.Content.ReadFromJsonAsync<OrderBody>();
         Assert.Equal(HttpStatusCode.OK, orderResponse.StatusCode);
 
+        var blockedDelete = await adminClient.DeleteAsync($"/api/admin/products/{product!.Id}");
+        Assert.Equal(HttpStatusCode.Conflict, blockedDelete.StatusCode);
+
         var status = await adminClient.PutAsJsonAsync($"/api/admin/orders/{order!.Id}/status", new { status = "Cancelled" });
         Assert.Equal(HttpStatusCode.OK, status.StatusCode);
 
@@ -84,6 +87,12 @@ public class AdminApiTests : IAsyncLifetime
 
         var self = await adminClient.PutAsJsonAsync($"/api/admin/users/{adminId}/blocked", new { isBlocked = true });
         Assert.Equal(HttpStatusCode.BadRequest, self.StatusCode);
+
+        var promoted = await adminClient.PutAsJsonAsync($"/api/admin/users/{adminId}/role", new { role = "Admin" });
+        Assert.Equal(HttpStatusCode.BadRequest, promoted.StatusCode);
+
+        var removed = await adminClient.DeleteAsync($"/api/admin/products/{product.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
     }
 
     private HttpClient Client(string token)

@@ -41,4 +41,8 @@ public class AdminController(AdminService admin) : ControllerBase
     [HttpPut("users/{id:int}/blocked")]
     public async Task<AdminUserResponse> SetUserBlocked(int id, SetUserBlockedRequest request, CancellationToken cancellationToken) =>
         await admin.SetUserBlockedAsync(CurrentUser.Id(User), id, request.IsBlocked, cancellationToken);
+
+    [HttpPut("users/{id:int}/role")]
+    public async Task<AdminUserResponse> SetUserRole(int id, SetUserRoleRequest request, CancellationToken cancellationToken) =>
+        await admin.SetUserRoleAsync(CurrentUser.Id(User), id, request.Role, cancellationToken);
 }

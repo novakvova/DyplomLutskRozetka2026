@@ -1,0 +1,574 @@
+From 552ad9e69ec938af766fb9202e1779d6fff9f5c3 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Sun, 22 Nov 2026 14:48:21 +0000
+Subject: [PATCH] =?UTF-8?q?fix:=20=D0=BA=D0=BE=D1=88=D0=B8=D0=BA,=20=D1=81?=
+ =?UTF-8?q?=D0=BA=D0=BB=D0=B0=D0=B4=20=D1=96=20=D1=80=D0=BE=D0=BB=D1=8C=20?=
+ =?UTF-8?q?=D0=B0=D0=B4=D0=BC=D1=96=D0=BD=D1=96=D1=81=D1=82=D1=80=D0=B0?=
+ =?UTF-8?q?=D1=82=D0=BE=D1=80=D0=B0;=20=D0=BF=D0=BE=D1=88=D1=83=D0=BA=20?=
+ =?UTF-8?q?=D1=83=20=D0=BA=D0=B0=D1=82=D0=B0=D0=BB=D0=BE=D0=B7=D1=96?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Кнопка «У кошик» додає одиницю, а не замінює кількість. Скасування замовлення повертає залишок лише один раз. Товар із відкритого замовлення не видаляється. В адмінці можна призначити або зняти адміністратора. У каталозі є пошук і сортування.
+---
+ RozetkaAPI/RozetkaAPI.Tests/AdminApiTests.cs  |  9 ++++
+ RozetkaAPI/RozetkaAPI.Tests/BuyerApiTests.cs  | 27 ++++++++++
+ .../RozetkaAPI/Contracts/ShopContracts.cs     |  4 ++
+ .../RozetkaAPI/Controllers/AdminController.cs |  4 ++
+ .../RozetkaAPI/Controllers/CartController.cs  |  4 ++
+ .../Controllers/ProductsController.cs         |  7 ++-
+ .../RozetkaAPI/Services/AdminService.cs       | 47 ++++++++++++++++-
+ RozetkaAPI/RozetkaAPI/Services/CartService.cs | 30 +++++++++++
+ .../RozetkaAPI/Services/CatalogService.cs     | 23 +++++++--
+ .../RozetkaAPI/Services/OrderService.cs       | 32 ++++++++----
+ vite-rozetka/src/pages/CartPage.tsx           |  7 ++-
+ vite-rozetka/src/pages/CatalogPage.tsx        | 50 ++++++++++++++++---
+ .../src/pages/admin/AdminProductsPage.tsx     |  2 +-
+ .../src/pages/admin/AdminUsersPage.tsx        | 48 ++++++++++++++----
+ 14 files changed, 256 insertions(+), 38 deletions(-)
+
+diff --git a/RozetkaAPI/RozetkaAPI.Tests/AdminApiTests.cs b/RozetkaAPI/RozetkaAPI.Tests/AdminApiTests.cs
+index a2431f6..5a91a16 100644
+--- a/RozetkaAPI/RozetkaAPI.Tests/AdminApiTests.cs
++++ b/RozetkaAPI/RozetkaAPI.Tests/AdminApiTests.cs
+@@ -73,6 +73,9 @@ public class AdminApiTests : IAsyncLifetime
+         var order = await orderResponse.Content.ReadFromJsonAsync<OrderBody>();
+         Assert.Equal(HttpStatusCode.OK, orderResponse.StatusCode);
+ 
++        var blockedDelete = await adminClient.DeleteAsync($"/api/admin/products/{product!.Id}");
++        Assert.Equal(HttpStatusCode.Conflict, blockedDelete.StatusCode);
++
+         var status = await adminClient.PutAsJsonAsync($"/api/admin/orders/{order!.Id}/status", new { status = "Cancelled" });
+         Assert.Equal(HttpStatusCode.OK, status.StatusCode);
+ 
+@@ -84,6 +87,12 @@ public class AdminApiTests : IAsyncLifetime
+ 
+         var self = await adminClient.PutAsJsonAsync($"/api/admin/users/{adminId}/blocked", new { isBlocked = true });
+         Assert.Equal(HttpStatusCode.BadRequest, self.StatusCode);
++
++        var promoted = await adminClient.PutAsJsonAsync($"/api/admin/users/{adminId}/role", new { role = "Admin" });
++        Assert.Equal(HttpStatusCode.BadRequest, promoted.StatusCode);
++
++        var removed = await adminClient.DeleteAsync($"/api/admin/products/{product.Id}");
++        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+     }
+ 
+     private HttpClient Client(string token)
+diff --git a/RozetkaAPI/RozetkaAPI.Tests/BuyerApiTests.cs b/RozetkaAPI/RozetkaAPI.Tests/BuyerApiTests.cs
+index 8ba49ef..94c4a1a 100644
+--- a/RozetkaAPI/RozetkaAPI.Tests/BuyerApiTests.cs
++++ b/RozetkaAPI/RozetkaAPI.Tests/BuyerApiTests.cs
+@@ -71,6 +71,30 @@ public class BuyerApiTests : IAsyncLifetime
+         Assert.Contains("/reset-password?token=", body?.ResetUrl, StringComparison.Ordinal);
+     }
+ 
++    [Fact]
++    public async Task Add_to_cart_increases_quantity_instead_of_resetting_it()
++    {
++        var (client, productId) = await AuthorizedClientWithProduct("cart@example.com", stock: 5);
++        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/cart", new { productId })).StatusCode);
++        var second = await client.PostAsJsonAsync("/api/cart", new { productId });
++        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
++        var cart = await second.Content.ReadFromJsonAsync<CartBody>();
++        Assert.Equal(2, cart?.Items.Single().Quantity);
++    }
++
++    [Fact]
++    public async Task Catalog_search_matches_name()
++    {
++        await AuthorizedClientWithProduct("search@example.com", stock: 4);
++        var response = await _client.GetAsync("/api/products?query=Тестовий&sort=name");
++        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
++        var products = await response.Content.ReadFromJsonAsync<List<ProductJson>>();
++        Assert.Contains(products!, item => item.Name.Contains("Тестовий", StringComparison.OrdinalIgnoreCase));
++
++        var empty = await _client.GetFromJsonAsync<List<ProductJson>>("/api/products?query=неіснуючий-товар");
++        Assert.Empty(empty!);
++    }
++
+     [Fact]
+     public async Task Checkout_reduces_stock_and_cancel_returns_it()
+     {
+@@ -180,6 +204,9 @@ public class BuyerApiTests : IAsyncLifetime
+     private sealed record AuthBody(string AccessToken);
+     private sealed record MessageBody(string Message, string? ResetUrl);
+     private sealed record OrderBody(int Id, string Status);
++    private sealed record CartBody(List<CartLineBody> Items);
++    private sealed record CartLineBody(int Quantity);
++    private sealed record ProductJson(int Id, string Name);
+ }
+ 
+ public sealed class ApiFactory : WebApplicationFactory<Program>
+diff --git a/RozetkaAPI/RozetkaAPI/Contracts/ShopContracts.cs b/RozetkaAPI/RozetkaAPI/Contracts/ShopContracts.cs
+index 8fd0b6a..a0375b3 100644
+--- a/RozetkaAPI/RozetkaAPI/Contracts/ShopContracts.cs
++++ b/RozetkaAPI/RozetkaAPI/Contracts/ShopContracts.cs
+@@ -46,6 +46,8 @@ public record CartResponse(IReadOnlyList<CartLineResponse> Items, decimal Total)
+ 
+ public record ChangeCartRequest(int ProductId, int Quantity);
+ 
++public record AddCartRequest(int ProductId);
++
+ public record FavoriteResponse(
+     int ProductId,
+     string Name,
+@@ -97,6 +99,8 @@ public record AdminUserResponse(
+ 
+ public record SetUserBlockedRequest(bool IsBlocked);
+ 
++public record SetUserRoleRequest(string Role);
++
+ public record OrderResponse(
+     int Id,
+     DateTime CreatedAt,
+diff --git a/RozetkaAPI/RozetkaAPI/Controllers/AdminController.cs b/RozetkaAPI/RozetkaAPI/Controllers/AdminController.cs
+index db7f4bd..fa11bdf 100644
+--- a/RozetkaAPI/RozetkaAPI/Controllers/AdminController.cs
++++ b/RozetkaAPI/RozetkaAPI/Controllers/AdminController.cs
+@@ -41,4 +41,8 @@ public class AdminController(AdminService admin) : ControllerBase
+     [HttpPut("users/{id:int}/blocked")]
+     public async Task<AdminUserResponse> SetUserBlocked(int id, SetUserBlockedRequest request, CancellationToken cancellationToken) =>
+         await admin.SetUserBlockedAsync(CurrentUser.Id(User), id, request.IsBlocked, cancellationToken);
++
++    [HttpPut("users/{id:int}/role")]
++    public async Task<AdminUserResponse> SetUserRole(int id, SetUserRoleRequest request, CancellationToken cancellationToken) =>
++        await admin.SetUserRoleAsync(CurrentUser.Id(User), id, request.Role, cancellationToken);
+ }
+diff --git a/RozetkaAPI/RozetkaAPI/Controllers/CartController.cs b/RozetkaAPI/RozetkaAPI/Controllers/CartController.cs
+index 99bbcc3..1384987 100644
+--- a/RozetkaAPI/RozetkaAPI/Controllers/CartController.cs
++++ b/RozetkaAPI/RozetkaAPI/Controllers/CartController.cs
+@@ -15,6 +15,10 @@ public class CartController(CartService cart) : ControllerBase
+     public async Task<CartResponse> Get(CancellationToken cancellationToken) =>
+         await cart.GetAsync(CurrentUser.Id(User), cancellationToken);
+ 
++    [HttpPost]
++    public async Task<CartResponse> Add(AddCartRequest request, CancellationToken cancellationToken) =>
++        await cart.AddOneAsync(CurrentUser.Id(User), request.ProductId, cancellationToken);
++
+     [HttpPut]
+     public async Task<CartResponse> Set(ChangeCartRequest request, CancellationToken cancellationToken) =>
+         await cart.SetQuantityAsync(CurrentUser.Id(User), request, cancellationToken);
+diff --git a/RozetkaAPI/RozetkaAPI/Controllers/ProductsController.cs b/RozetkaAPI/RozetkaAPI/Controllers/ProductsController.cs
+index 5ff3a2b..a7cbf36 100644
+--- a/RozetkaAPI/RozetkaAPI/Controllers/ProductsController.cs
++++ b/RozetkaAPI/RozetkaAPI/Controllers/ProductsController.cs
+@@ -11,8 +11,11 @@ namespace RozetkaAPI.Controllers;
+ public class ProductsController(CatalogService catalog, ReviewService reviews) : ControllerBase
+ {
+     [HttpGet]
+-    public async Task<IReadOnlyList<ProductListItemResponse>> List(CancellationToken cancellationToken) =>
+-        await catalog.ListAsync(cancellationToken);
++    public async Task<IReadOnlyList<ProductListItemResponse>> List(
++        [FromQuery] string? query,
++        [FromQuery] string? sort,
++        CancellationToken cancellationToken) =>
++        await catalog.ListAsync(query, sort, cancellationToken);
+ 
+     [HttpGet("{id:int}")]
+     public async Task<ProductDetailsResponse> Get(int id, CancellationToken cancellationToken) =>
+diff --git a/RozetkaAPI/RozetkaAPI/Services/AdminService.cs b/RozetkaAPI/RozetkaAPI/Services/AdminService.cs
+index 60ce368..1678ea6 100644
+--- a/RozetkaAPI/RozetkaAPI/Services/AdminService.cs
++++ b/RozetkaAPI/RozetkaAPI/Services/AdminService.cs
+@@ -33,6 +33,12 @@ public class AdminService(AppDbContext db)
+         await EnsureAdminAsync(userId, cancellationToken);
+         var product = await db.Products.SingleOrDefaultAsync(item => item.Id == productId, cancellationToken)
+             ?? throw new AppException(StatusCodes.Status404NotFound, "Товар не знайдено.");
++        var inOpenOrder = await db.OrderItems.AnyAsync(
++            item => item.ProductId == productId && item.Order.Status != OrderStatus.Cancelled,
++            cancellationToken);
++        if (inOpenOrder)
++            throw new AppException(StatusCodes.Status409Conflict, "Товар є в незавершеному замовленні. Спочатку завершіть або скасуйте його.");
++
+         db.Products.Remove(product);
+         await db.SaveChangesAsync(cancellationToken);
+     }
+@@ -68,7 +74,18 @@ public class AdminService(AppDbContext db)
+             throw new AppException(StatusCodes.Status400BadRequest, "Скасоване замовлення не можна повернути в роботу.");
+ 
+         if (status == OrderStatus.Cancelled)
++        {
++            var claimed = await db.Orders
++                .Where(item => item.Id == orderId && item.Status == order.Status)
++                .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Status, OrderStatus.Cancelled), cancellationToken);
++            if (claimed == 0)
++                throw new AppException(StatusCodes.Status400BadRequest, "Статус замовлення вже змінився. Оновіть список.");
++
++            order.Status = OrderStatus.Cancelled;
+             await RestoreStockAsync(order, cancellationToken);
++            await transaction.CommitAsync(cancellationToken);
++            return MapOrder(order);
++        }
+ 
+         order.Status = status;
+         await db.SaveChangesAsync(cancellationToken);
+@@ -106,7 +123,32 @@ public class AdminService(AppDbContext db)
+ 
+         user.IsBlocked = isBlocked;
+         await db.SaveChangesAsync(cancellationToken);
+-        return new AdminUserResponse(
++        return MapUser(user);
++    }
++
++    public async Task<AdminUserResponse> SetUserRoleAsync(int userId, int targetId, string roleName, CancellationToken cancellationToken)
++    {
++        await EnsureAdminAsync(userId, cancellationToken);
++        if (userId == targetId)
++            throw new AppException(StatusCodes.Status400BadRequest, "Не можна змінити власну роль.");
++        if (!Enum.TryParse<UserRole>(roleName, ignoreCase: false, out var role) || !Enum.IsDefined(role))
++            throw new AppException(StatusCodes.Status400BadRequest, "Невідома роль.");
++
++        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == targetId, cancellationToken)
++            ?? throw new AppException(StatusCodes.Status404NotFound, "Користувача не знайдено.");
++        if (user.Role == UserRole.Admin && role == UserRole.Buyer)
++        {
++            var otherAdmins = await db.Users.CountAsync(item => item.Role == UserRole.Admin && item.Id != user.Id, cancellationToken);
++            if (otherAdmins == 0)
++                throw new AppException(StatusCodes.Status400BadRequest, "Має лишитися хоча б один адміністратор.");
++        }
++
++        user.Role = role;
++        await db.SaveChangesAsync(cancellationToken);
++        return MapUser(user);
++    }
++
++    private static AdminUserResponse MapUser(User user) => new(
+             user.Id,
+             user.Email,
+             user.FirstName,
+@@ -115,7 +157,6 @@ public class AdminService(AppDbContext db)
+             user.Role.ToString(),
+             user.IsBlocked,
+             user.CreatedAt);
+-    }
+ 
+     private async Task EnsureAdminAsync(int userId, CancellationToken cancellationToken)
+     {
+@@ -150,6 +191,8 @@ public class AdminService(AppDbContext db)
+             if (products.TryGetValue(item.ProductId, out var product))
+                 product.Stock += item.Quantity;
+         }
++
++        await db.SaveChangesAsync(cancellationToken);
+     }
+ 
+     private static ProductListItemResponse MapProduct(Product product) => new(
+diff --git a/RozetkaAPI/RozetkaAPI/Services/CartService.cs b/RozetkaAPI/RozetkaAPI/Services/CartService.cs
+index 15acac3..f8590fc 100644
+--- a/RozetkaAPI/RozetkaAPI/Services/CartService.cs
++++ b/RozetkaAPI/RozetkaAPI/Services/CartService.cs
+@@ -16,6 +16,36 @@ public class CartService(AppDbContext db)
+         return new CartResponse(items, items.Sum(item => item.LineTotal));
+     }
+ 
++    public async Task<CartResponse> AddOneAsync(int userId, int productId, CancellationToken cancellationToken)
++    {
++        var product = await db.Products.SingleOrDefaultAsync(item => item.Id == productId, cancellationToken)
++            ?? throw new AppException(StatusCodes.Status404NotFound, "Товар не знайдено.");
++        var existing = await db.CartItems.SingleOrDefaultAsync(
++            item => item.UserId == userId && item.ProductId == productId, cancellationToken);
++        var next = (existing?.Quantity ?? 0) + 1;
++        if (next > MaxQuantity)
++            throw new AppException(StatusCodes.Status400BadRequest, $"Кількість має бути від 1 до {MaxQuantity}.");
++        if (product.Stock < next)
++            throw new AppException(StatusCodes.Status400BadRequest, "На складі немає такої кількості.");
++
++        if (existing is null)
++        {
++            db.CartItems.Add(new CartItem
++            {
++                UserId = userId,
++                ProductId = product.Id,
++                Quantity = 1
++            });
++        }
++        else
++        {
++            existing.Quantity = next;
++        }
++
++        await db.SaveChangesAsync(cancellationToken);
++        return await GetAsync(userId, cancellationToken);
++    }
++
+     public async Task<CartResponse> SetQuantityAsync(int userId, ChangeCartRequest request, CancellationToken cancellationToken)
+     {
+         if (request.Quantity < 0 || request.Quantity > MaxQuantity)
+diff --git a/RozetkaAPI/RozetkaAPI/Services/CatalogService.cs b/RozetkaAPI/RozetkaAPI/Services/CatalogService.cs
+index 1bb751a..12e7291 100644
+--- a/RozetkaAPI/RozetkaAPI/Services/CatalogService.cs
++++ b/RozetkaAPI/RozetkaAPI/Services/CatalogService.cs
+@@ -8,10 +8,27 @@ namespace RozetkaAPI.Services;
+ 
+ public class CatalogService(AppDbContext db)
+ {
+-    public async Task<IReadOnlyList<ProductListItemResponse>> ListAsync(CancellationToken cancellationToken)
++    public async Task<IReadOnlyList<ProductListItemResponse>> ListAsync(string? query, string? sort, CancellationToken cancellationToken)
+     {
+-        return await db.Products
+-            .OrderBy(product => product.Id)
++        var products = db.Products.AsQueryable();
++        if (!string.IsNullOrWhiteSpace(query))
++        {
++            var raw = query.Trim();
++            var term = raw.ToLower();
++            products = products.Where(product =>
++                product.Name.ToLower().Contains(term) || product.ShortDescription.ToLower().Contains(term)
++                || product.Name.Contains(raw) || product.ShortDescription.Contains(raw));
++        }
++
++        products = sort switch
++        {
++            "price_asc" => products.OrderBy(product => product.Price).ThenBy(product => product.Id),
++            "price_desc" => products.OrderByDescending(product => product.Price).ThenBy(product => product.Id),
++            "name" => products.OrderBy(product => product.Name).ThenBy(product => product.Id),
++            _ => products.OrderBy(product => product.Id)
++        };
++
++        return await products
+             .Select(product => new ProductListItemResponse(
+                 product.Id,
+                 product.Name,
+diff --git a/RozetkaAPI/RozetkaAPI/Services/OrderService.cs b/RozetkaAPI/RozetkaAPI/Services/OrderService.cs
+index 1e06937..cbba81d 100644
+--- a/RozetkaAPI/RozetkaAPI/Services/OrderService.cs
++++ b/RozetkaAPI/RozetkaAPI/Services/OrderService.cs
+@@ -93,28 +93,38 @@ public class OrderService(AppDbContext db)
+     public async Task<OrderResponse> CancelAsync(int userId, int orderId, CancellationToken cancellationToken)
+     {
+         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+-        var order = await db.Orders
+-            .Include(item => item.Items)
+-            .SingleOrDefaultAsync(item => item.Id == orderId && item.UserId == userId, cancellationToken)
+-            ?? throw new AppException(StatusCodes.Status404NotFound, "Замовлення не знайдено.");
++        var claimed = await db.Orders
++            .Where(item => item.Id == orderId && item.UserId == userId
++                && (item.Status == OrderStatus.New || item.Status == OrderStatus.AwaitingPayment))
++            .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Status, OrderStatus.Cancelled), cancellationToken);
+ 
+-        if (order.Status is not (OrderStatus.New or OrderStatus.AwaitingPayment))
+-            throw new AppException(StatusCodes.Status400BadRequest, "Це замовлення вже не можна скасувати.");
++        if (claimed == 0)
++        {
++            var exists = await db.Orders.AnyAsync(item => item.Id == orderId && item.UserId == userId, cancellationToken);
++            throw new AppException(
++                exists ? StatusCodes.Status400BadRequest : StatusCodes.Status404NotFound,
++                exists ? "Це замовлення вже не можна скасувати." : "Замовлення не знайдено.");
++        }
+ 
+-        var productIds = order.Items.Select(item => item.ProductId).Distinct().ToList();
++        await RestoreStockAsync(orderId, cancellationToken);
++        await transaction.CommitAsync(cancellationToken);
++        return await GetAsync(userId, orderId, cancellationToken);
++    }
++
++    private async Task RestoreStockAsync(int orderId, CancellationToken cancellationToken)
++    {
++        var items = await db.OrderItems.Where(item => item.OrderId == orderId).ToListAsync(cancellationToken);
++        var productIds = items.Select(item => item.ProductId).Distinct().ToList();
+         var products = await db.Products
+             .Where(product => productIds.Contains(product.Id))
+             .ToDictionaryAsync(product => product.Id, cancellationToken);
+-        foreach (var item in order.Items)
++        foreach (var item in items)
+         {
+             if (products.TryGetValue(item.ProductId, out var product))
+                 product.Stock += item.Quantity;
+         }
+ 
+-        order.Status = OrderStatus.Cancelled;
+         await db.SaveChangesAsync(cancellationToken);
+-        await transaction.CommitAsync(cancellationToken);
+-        return Map(order);
+     }
+ 
+     private IQueryable<CustomerOrder> Query(int userId) =>
+diff --git a/vite-rozetka/src/pages/CartPage.tsx b/vite-rozetka/src/pages/CartPage.tsx
+index 86fb070..7c64bcd 100644
+--- a/vite-rozetka/src/pages/CartPage.tsx
++++ b/vite-rozetka/src/pages/CartPage.tsx
+@@ -58,7 +58,12 @@ export function CartPage() {
+                 min={1}
+                 max={Math.min(20, item.stock)}
+                 value={item.quantity}
+-                onChange={(event) => void update(item.productId, Number(event.target.value))}
++                onChange={(event) => {
++                  const quantity = Number(event.target.value)
++                  if (!Number.isInteger(quantity) || quantity < 1)
++                    return
++                  void update(item.productId, quantity)
++                }}
+               />
+               <span className="w-28 text-right font-medium">{formatMoney(item.lineTotal)}</span>
+               <button type="button" className="text-sm text-red-700" onClick={() => void update(item.productId, 0)}>Прибрати</button>
+diff --git a/vite-rozetka/src/pages/CatalogPage.tsx b/vite-rozetka/src/pages/CatalogPage.tsx
+index d4b38ff..f8b64f5 100644
+--- a/vite-rozetka/src/pages/CatalogPage.tsx
++++ b/vite-rozetka/src/pages/CatalogPage.tsx
+@@ -13,19 +13,28 @@ export function CatalogPage() {
+   const [loading, setLoading] = useState(true)
+   const [error, setError] = useState('')
+   const [pendingId, setPendingId] = useState<number | null>(null)
++  const [query, setQuery] = useState('')
++  const [sort, setSort] = useState('new')
++  const [appliedQuery, setAppliedQuery] = useState('')
+ 
+-  function load() {
++  function load(search: string, nextSort: string) {
+     setLoading(true)
+     setError('')
+-    api<Product[]>('/api/products')
++    const params = new URLSearchParams()
++    if (search.trim())
++      params.set('query', search.trim())
++    if (nextSort !== 'new')
++      params.set('sort', nextSort)
++    const suffix = params.toString()
++    api<Product[]>(`/api/products${suffix ? `?${suffix}` : ''}`)
+       .then(setProducts)
+       .catch((reason: unknown) => setError(reason instanceof ApiError ? reason.message : 'Не вдалося завантажити товари.'))
+       .finally(() => setLoading(false))
+   }
+ 
+   useEffect(() => {
+-    load()
+-  }, [])
++    load(appliedQuery, sort)
++  }, [appliedQuery, sort])
+ 
+   async function addToCart(product: Product) {
+     if (!user) {
+@@ -36,8 +45,8 @@ export function CatalogPage() {
+     setError('')
+     try {
+       await api('/api/cart', {
+-        method: 'PUT',
+-        body: JSON.stringify({ productId: product.id, quantity: 1 }),
++        method: 'POST',
++        body: JSON.stringify({ productId: product.id }),
+       })
+       navigate('/cart')
+     } catch (reason) {
+@@ -49,10 +58,35 @@ export function CatalogPage() {
+ 
+   return (
+     <section>
+-      <h1 className="mb-4 text-2xl font-semibold">Товари</h1>
++      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
++        <h1 className="text-2xl font-semibold">Товари</h1>
++        <form className="flex flex-wrap gap-2" onSubmit={(event) => { event.preventDefault(); setAppliedQuery(query) }}>
++          <input
++            className="w-56 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm"
++            placeholder="Назва або опис"
++            value={query}
++            onChange={(event) => setQuery(event.target.value)}
++            aria-label="Пошук товарів"
++          />
++          <Button type="submit">Знайти</Button>
++          <select
++            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm"
++            value={sort}
++            aria-label="Сортування"
++            onChange={(event) => setSort(event.target.value)}
++          >
++            <option value="new">Спочатку додані</option>
++            <option value="name">За назвою</option>
++            <option value="price_asc">Спочатку дешевші</option>
++            <option value="price_desc">Спочатку дорожчі</option>
++          </select>
++        </form>
++      </div>
+       <ErrorText>{error}</ErrorText>
+       {loading ? <p className="mt-4 text-stone-600">Завантаження…</p> : null}
+-      {!loading && products.length === 0 ? <p className="mt-4 text-stone-600">Каталог порожній.</p> : null}
++      {!loading && products.length === 0 ? (
++        <p className="mt-4 text-stone-600">{appliedQuery.trim() ? 'Нічого не знайдено.' : 'Каталог порожній.'}</p>
++      ) : null}
+       <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+         {products.map((product) => (
+           <li key={product.id} className="flex flex-col rounded-xl border border-stone-200 bg-white p-4">
+diff --git a/vite-rozetka/src/pages/admin/AdminProductsPage.tsx b/vite-rozetka/src/pages/admin/AdminProductsPage.tsx
+index 0584900..707b6f8 100644
+--- a/vite-rozetka/src/pages/admin/AdminProductsPage.tsx
++++ b/vite-rozetka/src/pages/admin/AdminProductsPage.tsx
+@@ -66,7 +66,7 @@ export function AdminProductsPage() {
+   }
+ 
+   async function remove(product: Product) {
+-    if (!window.confirm(`Видалити «${product.name}»? Відгуки й позиції в кошиках зникнуть. Замовлення залишаться.`))
++    if (!window.confirm(`Видалити «${product.name}»? Відгуки й позиції в кошиках зникнуть. Товар із незавершеного замовлення видалити не можна.`))
+       return
+     setError('')
+     try {
+diff --git a/vite-rozetka/src/pages/admin/AdminUsersPage.tsx b/vite-rozetka/src/pages/admin/AdminUsersPage.tsx
+index b21915a..a8ec854 100644
+--- a/vite-rozetka/src/pages/admin/AdminUsersPage.tsx
++++ b/vite-rozetka/src/pages/admin/AdminUsersPage.tsx
+@@ -19,6 +19,22 @@ export function AdminUsersPage() {
+       .finally(() => setLoading(false))
+   }, [])
+ 
++  async function setRole(target: AdminUser, role: 'Admin' | 'Buyer') {
++    setPendingId(target.id)
++    setError('')
++    try {
++      const updated = await api<AdminUser>(`/api/admin/users/${target.id}/role`, {
++        method: 'PUT',
++        body: JSON.stringify({ role }),
++      })
++      setUsers((current) => current.map((item) => item.id === updated.id ? updated : item))
++    } catch (reason) {
++      setError(reason instanceof ApiError ? reason.message : 'Не вдалося змінити роль.')
++    } finally {
++      setPendingId(null)
++    }
++  }
++
+   async function setBlocked(target: AdminUser, isBlocked: boolean) {
+     setPendingId(target.id)
+     setError('')
+@@ -61,17 +77,29 @@ export function AdminUsersPage() {
+                 <td className="px-3 py-2">{item.role === 'Admin' ? 'Адміністратор' : 'Покупець'}</td>
+                 <td className="px-3 py-2 whitespace-nowrap">{formatDate(item.createdAt)}</td>
+                 <td className="px-3 py-2 text-right">
+-                  {item.id === user?.id || item.role === 'Admin' ? (
+-                    <span className="text-stone-400">{item.isBlocked ? 'Заблоковано' : 'Активний'}</span>
++                  {item.id === user?.id ? (
++                    <span className="text-stone-400">Це ви</span>
+                   ) : (
+-                    <button
+-                      type="button"
+-                      className="text-brand-800 hover:underline disabled:opacity-50"
+-                      disabled={pendingId === item.id}
+-                      onClick={() => void setBlocked(item, !item.isBlocked)}
+-                    >
+-                      {item.isBlocked ? 'Розблокувати' : 'Заблокувати'}
+-                    </button>
++                    <span className="inline-flex flex-wrap justify-end gap-2">
++                      <button
++                        type="button"
++                        className="text-brand-800 hover:underline disabled:opacity-50"
++                        disabled={pendingId === item.id}
++                        onClick={() => void setRole(item, item.role === 'Admin' ? 'Buyer' : 'Admin')}
++                      >
++                        {item.role === 'Admin' ? 'Зробити покупцем' : 'Зробити адміністратором'}
++                      </button>
++                      {item.role === 'Admin' ? null : (
++                        <button
++                          type="button"
++                          className="text-brand-800 hover:underline disabled:opacity-50"
++                          disabled={pendingId === item.id}
++                          onClick={() => void setBlocked(item, !item.isBlocked)}
++                        >
++                          {item.isBlocked ? 'Розблокувати' : 'Заблокувати'}
++                        </button>
++                      )}
++                    </span>
+                   )}
+                 </td>
+               </tr>
+-- 
+2.43.0
+

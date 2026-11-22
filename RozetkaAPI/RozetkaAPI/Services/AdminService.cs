@@ -33,6 +33,12 @@ public class AdminService(AppDbContext db)
         await EnsureAdminAsync(userId, cancellationToken);
         var product = await db.Products.SingleOrDefaultAsync(item => item.Id == productId, cancellationToken)
             ?? throw new AppException(StatusCodes.Status404NotFound, "Товар не знайдено.");
+        var inOpenOrder = await db.OrderItems.AnyAsync(
+            item => item.ProductId == productId && item.Order.Status != OrderStatus.Cancelled,
+            cancellationToken);
+        if (inOpenOrder)
+            throw new AppException(StatusCodes.Status409Conflict, "Товар є в незавершеному замовленні. Спочатку завершіть або скасуйте його.");
+
         db.Products.Remove(product);
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -68,7 +74,18 @@ public class AdminService(AppDbContext db)
             throw new AppException(StatusCodes.Status400BadRequest, "Скасоване замовлення не можна повернути в роботу.");
 
         if (status == OrderStatus.Cancelled)
+        {
+            var claimed = await db.Orders
+                .Where(item => item.Id == orderId && item.Status == order.Status)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Status, OrderStatus.Cancelled), cancellationToken);
+            if (claimed == 0)
+                throw new AppException(StatusCodes.Status400BadRequest, "Статус замовлення вже змінився. Оновіть список.");
+
+            order.Status = OrderStatus.Cancelled;
             await RestoreStockAsync(order, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return MapOrder(order);
+        }
 
         order.Status = status;
         await db.SaveChangesAsync(cancellationToken);
@@ -106,7 +123,32 @@ public class AdminService(AppDbContext db)
 
         user.IsBlocked = isBlocked;
         await db.SaveChangesAsync(cancellationToken);
-        return new AdminUserResponse(
+        return MapUser(user);
+    }
+
+    public async Task<AdminUserResponse> SetUserRoleAsync(int userId, int targetId, string roleName, CancellationToken cancellationToken)
+    {
+        await EnsureAdminAsync(userId, cancellationToken);
+        if (userId == targetId)
+            throw new AppException(StatusCodes.Status400BadRequest, "Не можна змінити власну роль.");
+        if (!Enum.TryParse<UserRole>(roleName, ignoreCase: false, out var role) || !Enum.IsDefined(role))
+            throw new AppException(StatusCodes.Status400BadRequest, "Невідома роль.");
+
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == targetId, cancellationToken)
+            ?? throw new AppException(StatusCodes.Status404NotFound, "Користувача не знайдено.");
+        if (user.Role == UserRole.Admin && role == UserRole.Buyer)
+        {
+            var otherAdmins = await db.Users.CountAsync(item => item.Role == UserRole.Admin && item.Id != user.Id, cancellationToken);
+            if (otherAdmins == 0)
+                throw new AppException(StatusCodes.Status400BadRequest, "Має лишитися хоча б один адміністратор.");
+        }
+
+        user.Role = role;
+        await db.SaveChangesAsync(cancellationToken);
+        return MapUser(user);
+    }
+
+    private static AdminUserResponse MapUser(User user) => new(
             user.Id,
             user.Email,
             user.FirstName,
@@ -115,7 +157,6 @@ public class AdminService(AppDbContext db)
             user.Role.ToString(),
             user.IsBlocked,
             user.CreatedAt);
-    }
 
     private async Task EnsureAdminAsync(int userId, CancellationToken cancellationToken)
     {
@@ -150,6 +191,8 @@ public class AdminService(AppDbContext db)
             if (products.TryGetValue(item.ProductId, out var product))
                 product.Stock += item.Quantity;
         }
+
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static ProductListItemResponse MapProduct(Product product) => new(

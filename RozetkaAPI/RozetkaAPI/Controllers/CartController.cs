@@ -15,6 +15,10 @@ public class CartController(CartService cart) : ControllerBase
     public async Task<CartResponse> Get(CancellationToken cancellationToken) =>
         await cart.GetAsync(CurrentUser.Id(User), cancellationToken);
 
+    [HttpPost]
+    public async Task<CartResponse> Add(AddCartRequest request, CancellationToken cancellationToken) =>
+        await cart.AddOneAsync(CurrentUser.Id(User), request.ProductId, cancellationToken);
+
     [HttpPut]
     public async Task<CartResponse> Set(ChangeCartRequest request, CancellationToken cancellationToken) =>
         await cart.SetQuantityAsync(CurrentUser.Id(User), request, cancellationToken);

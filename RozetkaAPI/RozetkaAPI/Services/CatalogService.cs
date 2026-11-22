@@ -8,10 +8,27 @@ namespace RozetkaAPI.Services;
 
 public class CatalogService(AppDbContext db)
 {
-    public async Task<IReadOnlyList<ProductListItemResponse>> ListAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ProductListItemResponse>> ListAsync(string? query, string? sort, CancellationToken cancellationToken)
     {
-        return await db.Products
-            .OrderBy(product => product.Id)
+        var products = db.Products.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var raw = query.Trim();
+            var term = raw.ToLower();
+            products = products.Where(product =>
+                product.Name.ToLower().Contains(term) || product.ShortDescription.ToLower().Contains(term)
+                || product.Name.Contains(raw) || product.ShortDescription.Contains(raw));
+        }
+
+        products = sort switch
+        {
+            "price_asc" => products.OrderBy(product => product.Price).ThenBy(product => product.Id),
+            "price_desc" => products.OrderByDescending(product => product.Price).ThenBy(product => product.Id),
+            "name" => products.OrderBy(product => product.Name).ThenBy(product => product.Id),
+            _ => products.OrderBy(product => product.Id)
+        };
+
+        return await products
             .Select(product => new ProductListItemResponse(
                 product.Id,
                 product.Name,

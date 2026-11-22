@@ -58,7 +58,12 @@ export function CartPage() {
                 min={1}
                 max={Math.min(20, item.stock)}
                 value={item.quantity}
-                onChange={(event) => void update(item.productId, Number(event.target.value))}
+                onChange={(event) => {
+                  const quantity = Number(event.target.value)
+                  if (!Number.isInteger(quantity) || quantity < 1)
+                    return
+                  void update(item.productId, quantity)
+                }}
               />
               <span className="w-28 text-right font-medium">{formatMoney(item.lineTotal)}</span>
               <button type="button" className="text-sm text-red-700" onClick={() => void update(item.productId, 0)}>Прибрати</button>
