@@ -46,6 +46,8 @@ public record CartResponse(IReadOnlyList<CartLineResponse> Items, decimal Total)
 
 public record ChangeCartRequest(int ProductId, int Quantity);
 
+public record AddCartRequest(int ProductId);
+
 public record FavoriteResponse(
     int ProductId,
     string Name,
@@ -96,6 +98,8 @@ public record AdminUserResponse(
     DateTime CreatedAt);
 
 public record SetUserBlockedRequest(bool IsBlocked);
+
+public record SetUserRoleRequest(string Role);
 
 public record OrderResponse(
     int Id,

@@ -11,8 +11,11 @@ namespace RozetkaAPI.Controllers;
 public class ProductsController(CatalogService catalog, ReviewService reviews) : ControllerBase
 {
     [HttpGet]
-    public async Task<IReadOnlyList<ProductListItemResponse>> List(CancellationToken cancellationToken) =>
-        await catalog.ListAsync(cancellationToken);
+    public async Task<IReadOnlyList<ProductListItemResponse>> List(
+        [FromQuery] string? query,
+        [FromQuery] string? sort,
+        CancellationToken cancellationToken) =>
+        await catalog.ListAsync(query, sort, cancellationToken);
 
     [HttpGet("{id:int}")]
     public async Task<ProductDetailsResponse> Get(int id, CancellationToken cancellationToken) =>

@@ -19,6 +19,22 @@ export function AdminUsersPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  async function setRole(target: AdminUser, role: 'Admin' | 'Buyer') {
+    setPendingId(target.id)
+    setError('')
+    try {
+      const updated = await api<AdminUser>(`/api/admin/users/${target.id}/role`, {
+        method: 'PUT',
+        body: JSON.stringify({ role }),
+      })
+      setUsers((current) => current.map((item) => item.id === updated.id ? updated : item))
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : 'Не вдалося змінити роль.')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
   async function setBlocked(target: AdminUser, isBlocked: boolean) {
     setPendingId(target.id)
     setError('')
@@ -61,17 +77,29 @@ export function AdminUsersPage() {
                 <td className="px-3 py-2">{item.role === 'Admin' ? 'Адміністратор' : 'Покупець'}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{formatDate(item.createdAt)}</td>
                 <td className="px-3 py-2 text-right">
-                  {item.id === user?.id || item.role === 'Admin' ? (
-                    <span className="text-stone-400">{item.isBlocked ? 'Заблоковано' : 'Активний'}</span>
+                  {item.id === user?.id ? (
+                    <span className="text-stone-400">Це ви</span>
                   ) : (
-                    <button
-                      type="button"
-                      className="text-brand-800 hover:underline disabled:opacity-50"
-                      disabled={pendingId === item.id}
-                      onClick={() => void setBlocked(item, !item.isBlocked)}
-                    >
-                      {item.isBlocked ? 'Розблокувати' : 'Заблокувати'}
-                    </button>
+                    <span className="inline-flex flex-wrap justify-end gap-2">
+                      <button
+                        type="button"
+                        className="text-brand-800 hover:underline disabled:opacity-50"
+                        disabled={pendingId === item.id}
+                        onClick={() => void setRole(item, item.role === 'Admin' ? 'Buyer' : 'Admin')}
+                      >
+                        {item.role === 'Admin' ? 'Зробити покупцем' : 'Зробити адміністратором'}
+                      </button>
+                      {item.role === 'Admin' ? null : (
+                        <button
+                          type="button"
+                          className="text-brand-800 hover:underline disabled:opacity-50"
+                          disabled={pendingId === item.id}
+                          onClick={() => void setBlocked(item, !item.isBlocked)}
+                        >
+                          {item.isBlocked ? 'Розблокувати' : 'Заблокувати'}
+                        </button>
+                      )}
+                    </span>
                   )}
                 </td>
               </tr>

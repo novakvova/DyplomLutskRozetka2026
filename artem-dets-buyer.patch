@@ -1,0 +1,542 @@
+From ce0ad50e6192b5ed4206cc456bfe9ad2a46af124 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Sat, 14 Nov 2026 23:03:34 +0000
+Subject: [PATCH] Send password-reset mail and let buyers cancel open orders.
+
+SMTP settings send the reset link; local development still shows it when the host is empty. Cancelling a new or unpaid order puts the stock back. Tests cover duplicate registration, a blocked login, stock, and cancel.
+---
+ RozetkaAPI/RozetkaAPI.Tests/BuyerApiTests.cs  | 208 ++++++++++++++++++
+ .../RozetkaAPI.Tests/RozetkaAPI.Tests.csproj  |  25 +++
+ RozetkaAPI/RozetkaAPI.slnx                    |   1 +
+ .../Controllers/OrdersController.cs           |   4 +
+ RozetkaAPI/RozetkaAPI/Program.cs              |  16 +-
+ RozetkaAPI/RozetkaAPI/RozetkaAPI.csproj       |   1 +
+ RozetkaAPI/RozetkaAPI/Services/AuthService.cs |  11 +-
+ .../RozetkaAPI/Services/OrderService.cs       |  27 +++
+ RozetkaAPI/RozetkaAPI/Services/ResetMailer.cs |  45 ++++
+ RozetkaAPI/RozetkaAPI/appsettings.json        |   8 +
+ vite-rozetka/src/pages/OrderPage.tsx          |  22 +-
+ 11 files changed, 363 insertions(+), 5 deletions(-)
+ create mode 100644 RozetkaAPI/RozetkaAPI.Tests/BuyerApiTests.cs
+ create mode 100644 RozetkaAPI/RozetkaAPI.Tests/RozetkaAPI.Tests.csproj
+ create mode 100644 RozetkaAPI/RozetkaAPI/Services/ResetMailer.cs
+
+diff --git a/RozetkaAPI/RozetkaAPI.Tests/BuyerApiTests.cs b/RozetkaAPI/RozetkaAPI.Tests/BuyerApiTests.cs
+new file mode 100644
+index 0000000..8ba49ef
+--- /dev/null
++++ b/RozetkaAPI/RozetkaAPI.Tests/BuyerApiTests.cs
+@@ -0,0 +1,208 @@
++using System.Net;
++using System.Net.Http.Headers;
++using System.Net.Http.Json;
++using Microsoft.AspNetCore.Hosting;
++using Microsoft.AspNetCore.Mvc.Testing;
++using Microsoft.EntityFrameworkCore;
++using Microsoft.Extensions.DependencyInjection;
++using RozetkaAPI.Data;
++using RozetkaAPI.Entities;
++using Xunit;
++
++namespace RozetkaAPI.Tests;
++
++public class BuyerApiTests : IAsyncLifetime
++{
++    private readonly ApiFactory _factory = new();
++    private HttpClient _client = null!;
++
++    public async Task InitializeAsync()
++    {
++        using var scope = _factory.Services.CreateScope();
++        var database = scope.ServiceProvider.GetRequiredService<AppDbContext>();
++        await database.Database.EnsureCreatedAsync();
++        _client = _factory.CreateClient();
++    }
++
++    public Task DisposeAsync()
++    {
++        _client.Dispose();
++        _factory.Dispose();
++        return Task.CompletedTask;
++    }
++
++    [Fact]
++    public async Task Register_rejects_duplicate_email()
++    {
++        var body = RegisterBody("buyer@example.com");
++        Assert.Equal(HttpStatusCode.OK, (await _client.PostAsJsonAsync("/api/auth/register", body)).StatusCode);
++
++        var repeat = await _client.PostAsJsonAsync("/api/auth/register", body);
++        Assert.Equal(HttpStatusCode.Conflict, repeat.StatusCode);
++    }
++
++    [Fact]
++    public async Task Login_rejects_blocked_user()
++    {
++        const string email = "blocked@example.com";
++        Assert.Equal(HttpStatusCode.OK, (await _client.PostAsJsonAsync("/api/auth/register", RegisterBody(email))).StatusCode);
++
++        using (var scope = _factory.Services.CreateScope())
++        {
++            var database = scope.ServiceProvider.GetRequiredService<AppDbContext>();
++            var user = await database.Users.SingleAsync(item => item.Email == email);
++            user.IsBlocked = true;
++            await database.SaveChangesAsync();
++        }
++
++        var login = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "Buyer12345" });
++        Assert.Equal(HttpStatusCode.Forbidden, login.StatusCode);
++    }
++
++    [Fact]
++    public async Task Forgot_password_returns_link_when_smtp_is_empty()
++    {
++        const string email = "reset@example.com";
++        Assert.Equal(HttpStatusCode.OK, (await _client.PostAsJsonAsync("/api/auth/register", RegisterBody(email))).StatusCode);
++
++        var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email });
++        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
++        var body = await response.Content.ReadFromJsonAsync<MessageBody>();
++        Assert.Contains("/reset-password?token=", body?.ResetUrl, StringComparison.Ordinal);
++    }
++
++    [Fact]
++    public async Task Checkout_reduces_stock_and_cancel_returns_it()
++    {
++        var (client, productId) = await AuthorizedClientWithProduct("stock@example.com", stock: 2);
++        await SetCart(client, productId, 2);
++
++        var created = await client.PostAsJsonAsync("/api/orders", CheckoutBody());
++        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
++        var order = await created.Content.ReadFromJsonAsync<OrderBody>();
++        Assert.Equal("New", order?.Status);
++        Assert.Equal(0, await Stock(productId));
++
++        var cancelled = await client.PostAsync($"/api/orders/{order!.Id}/cancel", null);
++        Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
++        Assert.Equal("Cancelled", (await cancelled.Content.ReadFromJsonAsync<OrderBody>())?.Status);
++        Assert.Equal(2, await Stock(productId));
++
++        var again = await client.PostAsync($"/api/orders/{order.Id}/cancel", null);
++        Assert.Equal(HttpStatusCode.BadRequest, again.StatusCode);
++    }
++
++    [Fact]
++    public async Task Checkout_rejects_when_stock_dropped_after_cart()
++    {
++        var (client, productId) = await AuthorizedClientWithProduct("short@example.com", stock: 2);
++        await SetCart(client, productId, 2);
++
++        using (var scope = _factory.Services.CreateScope())
++        {
++            var database = scope.ServiceProvider.GetRequiredService<AppDbContext>();
++            var product = await database.Products.SingleAsync(item => item.Id == productId);
++            product.Stock = 1;
++            await database.SaveChangesAsync();
++        }
++
++        var created = await client.PostAsJsonAsync("/api/orders", CheckoutBody());
++        Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
++        Assert.Equal(1, await Stock(productId));
++        Assert.Equal(0, await OrdersFor(productId));
++    }
++
++    private async Task<(HttpClient Client, int ProductId)> AuthorizedClientWithProduct(string email, int stock)
++    {
++        var registered = await _client.PostAsJsonAsync("/api/auth/register", RegisterBody(email));
++        var auth = await registered.Content.ReadFromJsonAsync<AuthBody>();
++        var client = _factory.CreateClient();
++        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
++
++        int productId;
++        using (var scope = _factory.Services.CreateScope())
++        {
++            var database = scope.ServiceProvider.GetRequiredService<AppDbContext>();
++            var product = new Product
++            {
++                Name = "Тестовий товар",
++                ShortDescription = "Для перевірки складу",
++                Price = 100,
++                Stock = stock,
++                CreatedAt = DateTime.UtcNow
++            };
++            database.Products.Add(product);
++            await database.SaveChangesAsync();
++            productId = product.Id;
++        }
++
++        return (client, productId);
++    }
++
++    private static async Task SetCart(HttpClient client, int productId, int quantity)
++    {
++        var response = await client.PutAsJsonAsync("/api/cart", new { productId, quantity });
++        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
++    }
++
++    private async Task<int> Stock(int productId)
++    {
++        using var scope = _factory.Services.CreateScope();
++        var database = scope.ServiceProvider.GetRequiredService<AppDbContext>();
++        return await database.Products.Where(item => item.Id == productId).Select(item => item.Stock).SingleAsync();
++    }
++
++    private async Task<int> OrdersFor(int productId)
++    {
++        using var scope = _factory.Services.CreateScope();
++        var database = scope.ServiceProvider.GetRequiredService<AppDbContext>();
++        return await database.OrderItems.CountAsync(item => item.ProductId == productId);
++    }
++
++    private static object RegisterBody(string email) => new
++    {
++        email,
++        password = "Buyer12345",
++        firstName = "Олена",
++        lastName = "Коваль"
++    };
++
++    private static object CheckoutBody() => new
++    {
++        recipientName = "Олена Коваль",
++        phone = "+380671234567",
++        city = "Луцьк",
++        deliveryMethod = "nova_poshta",
++        deliveryAddress = "Відділення 3",
++        paymentMethod = "cash_on_delivery"
++    };
++
++    private sealed record AuthBody(string AccessToken);
++    private sealed record MessageBody(string Message, string? ResetUrl);
++    private sealed record OrderBody(int Id, string Status);
++}
++
++public sealed class ApiFactory : WebApplicationFactory<Program>
++{
++    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"rozetka-tests-{Guid.NewGuid():N}.db");
++
++    protected override void ConfigureWebHost(IWebHostBuilder builder)
++    {
++        builder.UseSetting("Database:ApplyMigrations", "false");
++        builder.UseSetting("Database:Sqlite", $"Data Source={_databasePath}");
++        builder.UseSetting("Auth:ExposeResetLink", "true");
++        builder.UseSetting("Smtp:Host", "");
++    }
++
++    protected override void Dispose(bool disposing)
++    {
++        base.Dispose(disposing);
++        try
++        {
++            File.Delete(_databasePath);
++        }
++        catch (IOException)
++        {
++        }
++    }
++}
+diff --git a/RozetkaAPI/RozetkaAPI.Tests/RozetkaAPI.Tests.csproj b/RozetkaAPI/RozetkaAPI.Tests/RozetkaAPI.Tests.csproj
+new file mode 100644
+index 0000000..7897082
+--- /dev/null
++++ b/RozetkaAPI/RozetkaAPI.Tests/RozetkaAPI.Tests.csproj
+@@ -0,0 +1,25 @@
++<Project Sdk="Microsoft.NET.Sdk">
++
++  <PropertyGroup>
++    <TargetFramework>net10.0</TargetFramework>
++    <Nullable>enable</Nullable>
++    <ImplicitUsings>enable</ImplicitUsings>
++    <IsPackable>false</IsPackable>
++  </PropertyGroup>
++
++  <ItemGroup>
++    <FrameworkReference Include="Microsoft.AspNetCore.App" />
++  </ItemGroup>
++
++  <ItemGroup>
++    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.14" />
++    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
++    <PackageReference Include="xunit" Version="2.9.3" />
++    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
++  </ItemGroup>
++
++  <ItemGroup>
++    <ProjectReference Include="..\RozetkaAPI\RozetkaAPI.csproj" />
++  </ItemGroup>
++
++</Project>
+diff --git a/RozetkaAPI/RozetkaAPI.slnx b/RozetkaAPI/RozetkaAPI.slnx
+index 135ac18..fefc201 100644
+--- a/RozetkaAPI/RozetkaAPI.slnx
++++ b/RozetkaAPI/RozetkaAPI.slnx
+@@ -1,3 +1,4 @@
+ <Solution>
+   <Project Path="RozetkaAPI/RozetkaAPI.csproj" />
++  <Project Path="RozetkaAPI.Tests/RozetkaAPI.Tests.csproj" />
+ </Solution>
+diff --git a/RozetkaAPI/RozetkaAPI/Controllers/OrdersController.cs b/RozetkaAPI/RozetkaAPI/Controllers/OrdersController.cs
+index a7b5226..7c2156a 100644
+--- a/RozetkaAPI/RozetkaAPI/Controllers/OrdersController.cs
++++ b/RozetkaAPI/RozetkaAPI/Controllers/OrdersController.cs
+@@ -22,4 +22,8 @@ public class OrdersController(OrderService orders) : ControllerBase
+     [HttpPost]
+     public async Task<OrderResponse> Checkout(CheckoutRequest request, CancellationToken cancellationToken) =>
+         await orders.CheckoutAsync(CurrentUser.Id(User), request, cancellationToken);
++
++    [HttpPost("{id:int}/cancel")]
++    public async Task<OrderResponse> Cancel(int id, CancellationToken cancellationToken) =>
++        await orders.CancelAsync(CurrentUser.Id(User), id, cancellationToken);
+ }
+diff --git a/RozetkaAPI/RozetkaAPI/Program.cs b/RozetkaAPI/RozetkaAPI/Program.cs
+index fd5787d..3d55d13 100644
+--- a/RozetkaAPI/RozetkaAPI/Program.cs
++++ b/RozetkaAPI/RozetkaAPI/Program.cs
+@@ -32,11 +32,18 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
+     };
+ });
+ 
+-var connectionString = builder.Configuration.GetConnectionString("Default")
+-    ?? throw new InvalidOperationException("У конфігурації немає рядка підключення Default.");
+-builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
++var sqlite = builder.Configuration["Database:Sqlite"];
++if (!string.IsNullOrWhiteSpace(sqlite))
++    builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(sqlite));
++else
++{
++    var connectionString = builder.Configuration.GetConnectionString("Default")
++        ?? throw new InvalidOperationException("У конфігурації немає рядка підключення Default.");
++    builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
++}
+ builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+ builder.Services.AddScoped<TokenService>();
++builder.Services.AddSingleton<ResetMailer>();
+ builder.Services.AddScoped<AuthService>();
+ builder.Services.AddScoped<CatalogService>();
+ builder.Services.AddScoped<CartService>();
+@@ -140,6 +147,9 @@ app.Run();
+ 
+ static async Task MigrateAndSeedAsync(WebApplication app)
+ {
++    if (!app.Configuration.GetValue("Database:ApplyMigrations", true))
++        return;
++
+     const int attempts = 10;
+     for (var attempt = 1; attempt <= attempts; attempt++)
+     {
+diff --git a/RozetkaAPI/RozetkaAPI/RozetkaAPI.csproj b/RozetkaAPI/RozetkaAPI/RozetkaAPI.csproj
+index 933fe27..f8a1962 100644
+--- a/RozetkaAPI/RozetkaAPI/RozetkaAPI.csproj
++++ b/RozetkaAPI/RozetkaAPI/RozetkaAPI.csproj
+@@ -13,6 +13,7 @@
+       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+       <PrivateAssets>all</PrivateAssets>
+     </PackageReference>
++    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />
+     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.1" />
+   </ItemGroup>
+diff --git a/RozetkaAPI/RozetkaAPI/Services/AuthService.cs b/RozetkaAPI/RozetkaAPI/Services/AuthService.cs
+index 59f1943..eec29b4 100644
+--- a/RozetkaAPI/RozetkaAPI/Services/AuthService.cs
++++ b/RozetkaAPI/RozetkaAPI/Services/AuthService.cs
+@@ -15,6 +15,7 @@ public class AuthService(
+     IPasswordHasher<User> hasher,
+     TokenService tokens,
+     IConfiguration configuration,
++    ResetMailer mailer,
+     ILogger<AuthService> logger)
+ {
+     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken)
+@@ -115,7 +116,7 @@ public class AuthService(
+ 
+     public async Task<MessageResponse> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken)
+     {
+-        const string generic = "Якщо обліковий запис існує, ми підготували посилання для нового пароля.";
++        const string generic = "Якщо обліковий запис існує, ми надіслали лист із посиланням для нового пароля.";
+         var email = InputRules.Email(request.Email);
+         var user = await db.Users.SingleOrDefaultAsync(item => item.Email == email, cancellationToken);
+         if (user is null || user.IsBlocked || user.PasswordHash is null)
+@@ -141,9 +142,17 @@ public class AuthService(
+ 
+         var frontend = configuration["Auth:FrontendUrl"] ?? "http://localhost:43123";
+         var resetUrl = $"{frontend.TrimEnd('/')}/reset-password?token={Uri.EscapeDataString(rawToken)}";
++        if (mailer.IsConfigured)
++        {
++            await mailer.SendAsync(user.Email, resetUrl, cancellationToken);
++            return new MessageResponse(generic);
++        }
++
+         var expose = configuration.GetValue("Auth:ExposeResetLink", false);
+         if (expose)
+             logger.LogInformation("Посилання для відновлення пароля {Email}: {ResetUrl}", user.Email, resetUrl);
++        else
++            logger.LogWarning("SMTP не налаштований, лист для {Email} не надіслано.", user.Email);
+ 
+         return new MessageResponse(generic, expose ? resetUrl : null);
+     }
+diff --git a/RozetkaAPI/RozetkaAPI/Services/OrderService.cs b/RozetkaAPI/RozetkaAPI/Services/OrderService.cs
+index c50287a..1e06937 100644
+--- a/RozetkaAPI/RozetkaAPI/Services/OrderService.cs
++++ b/RozetkaAPI/RozetkaAPI/Services/OrderService.cs
+@@ -90,6 +90,33 @@ public class OrderService(AppDbContext db)
+         return Map(order);
+     }
+ 
++    public async Task<OrderResponse> CancelAsync(int userId, int orderId, CancellationToken cancellationToken)
++    {
++        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
++        var order = await db.Orders
++            .Include(item => item.Items)
++            .SingleOrDefaultAsync(item => item.Id == orderId && item.UserId == userId, cancellationToken)
++            ?? throw new AppException(StatusCodes.Status404NotFound, "Замовлення не знайдено.");
++
++        if (order.Status is not (OrderStatus.New or OrderStatus.AwaitingPayment))
++            throw new AppException(StatusCodes.Status400BadRequest, "Це замовлення вже не можна скасувати.");
++
++        var productIds = order.Items.Select(item => item.ProductId).Distinct().ToList();
++        var products = await db.Products
++            .Where(product => productIds.Contains(product.Id))
++            .ToDictionaryAsync(product => product.Id, cancellationToken);
++        foreach (var item in order.Items)
++        {
++            if (products.TryGetValue(item.ProductId, out var product))
++                product.Stock += item.Quantity;
++        }
++
++        order.Status = OrderStatus.Cancelled;
++        await db.SaveChangesAsync(cancellationToken);
++        await transaction.CommitAsync(cancellationToken);
++        return Map(order);
++    }
++
+     private IQueryable<CustomerOrder> Query(int userId) =>
+         db.Orders.Include(order => order.Items).Where(order => order.UserId == userId).OrderByDescending(order => order.CreatedAt);
+ 
+diff --git a/RozetkaAPI/RozetkaAPI/Services/ResetMailer.cs b/RozetkaAPI/RozetkaAPI/Services/ResetMailer.cs
+new file mode 100644
+index 0000000..f8c1277
+--- /dev/null
++++ b/RozetkaAPI/RozetkaAPI/Services/ResetMailer.cs
+@@ -0,0 +1,45 @@
++using System.Net;
++using System.Net.Mail;
++using RozetkaAPI.Common;
++
++namespace RozetkaAPI.Services;
++
++public class ResetMailer(IConfiguration configuration, ILogger<ResetMailer> logger)
++{
++    public bool IsConfigured => !string.IsNullOrWhiteSpace(configuration["Smtp:Host"]);
++
++    public async Task SendAsync(string email, string resetUrl, CancellationToken cancellationToken)
++    {
++        var host = configuration["Smtp:Host"] ?? "";
++        var port = configuration.GetValue("Smtp:Port", 587);
++        var user = configuration["Smtp:User"];
++        var password = configuration["Smtp:Password"];
++        var from = configuration["Smtp:From"];
++        if (string.IsNullOrWhiteSpace(from))
++            from = string.IsNullOrWhiteSpace(user) ? "noreply@localhost" : user;
++
++        using var message = new MailMessage(from, email)
++        {
++            Subject = "Відновлення пароля",
++            Body = $"Щоб задати новий пароль, відкрийте посилання. Воно діє одну годину:\n{resetUrl}"
++        };
++
++#pragma warning disable SYSLIB0014
++        using var client = new SmtpClient(host, port);
++        client.EnableSsl = configuration.GetValue("Smtp:Ssl", true);
++        client.Timeout = 15000;
++        if (!string.IsNullOrWhiteSpace(user))
++            client.Credentials = new NetworkCredential(user, password);
++#pragma warning restore SYSLIB0014
++
++        try
++        {
++            await client.SendMailAsync(message, cancellationToken);
++        }
++        catch (Exception exception)
++        {
++            logger.LogError(exception, "Не вдалося надіслати лист для відновлення пароля на {Email}", email);
++            throw new AppException(StatusCodes.Status503ServiceUnavailable, "Не вдалося надіслати лист. Спробуйте ще раз.");
++        }
++    }
++}
+diff --git a/RozetkaAPI/RozetkaAPI/appsettings.json b/RozetkaAPI/RozetkaAPI/appsettings.json
+index eac6af1..f81eb31 100644
+--- a/RozetkaAPI/RozetkaAPI/appsettings.json
++++ b/RozetkaAPI/RozetkaAPI/appsettings.json
+@@ -15,6 +15,14 @@
+     "ExposeResetLink": false,
+     "FrontendUrl": "http://localhost:43123"
+   },
++  "Smtp": {
++    "Host": "",
++    "Port": 587,
++    "Ssl": true,
++    "User": "",
++    "Password": "",
++    "From": ""
++  },
+   "Cors": {
+     "Origins": [
+       "http://localhost:43123",
+diff --git a/vite-rozetka/src/pages/OrderPage.tsx b/vite-rozetka/src/pages/OrderPage.tsx
+index 48e8b16..a8e1f36 100644
+--- a/vite-rozetka/src/pages/OrderPage.tsx
++++ b/vite-rozetka/src/pages/OrderPage.tsx
+@@ -1,7 +1,7 @@
+ import { useEffect, useState } from 'react'
+ import { Link, useParams } from 'react-router-dom'
+ import { api, ApiError } from '../api'
+-import { ErrorText } from '../components/Field'
++import { Button, ErrorText } from '../components/Field'
+ import { deliveryLabel, formatDate, formatMoney, orderStatusLabel, paymentLabel } from '../lib/format'
+ import type { Order } from '../types'
+ 
+@@ -9,6 +9,7 @@ export function OrderPage() {
+   const { id } = useParams()
+   const [order, setOrder] = useState<Order | null>(null)
+   const [error, setError] = useState('')
++  const [busy, setBusy] = useState(false)
+ 
+   useEffect(() => {
+     api<Order>(`/api/orders/${id}`)
+@@ -21,6 +22,21 @@ export function OrderPage() {
+   if (!order)
+     return <p className="text-stone-600">Завантаження…</p>
+ 
++  const current = order
++  const canCancel = current.status === 'New' || current.status === 'AwaitingPayment'
++
++  async function cancel() {
++    setBusy(true)
++    setError('')
++    try {
++      setOrder(await api<Order>(`/api/orders/${current.id}/cancel`, { method: 'POST' }))
++    } catch (reason) {
++      setError(reason instanceof ApiError ? reason.message : 'Не вдалося скасувати замовлення.')
++    } finally {
++      setBusy(false)
++    }
++  }
++
+   return (
+     <section className="max-w-2xl space-y-4">
+       <Link to="/orders" className="text-sm text-brand-800">До списку замовлень</Link>
+@@ -41,6 +57,10 @@ export function OrderPage() {
+         ))}
+       </ul>
+       <p className="text-xl font-semibold">Разом {formatMoney(order.total)}</p>
++      {canCancel ? (
++        <Button type="button" disabled={busy} onClick={() => void cancel()}>Скасувати замовлення</Button>
++      ) : null}
++      <ErrorText>{error}</ErrorText>
+     </section>
+   )
+ }
+-- 
+2.43.0
+

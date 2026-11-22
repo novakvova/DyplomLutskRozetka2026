@@ -13,19 +13,28 @@ export function CatalogPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pendingId, setPendingId] = useState<number | null>(null)
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState('new')
+  const [appliedQuery, setAppliedQuery] = useState('')
 
-  function load() {
+  function load(search: string, nextSort: string) {
     setLoading(true)
     setError('')
-    api<Product[]>('/api/products')
+    const params = new URLSearchParams()
+    if (search.trim())
+      params.set('query', search.trim())
+    if (nextSort !== 'new')
+      params.set('sort', nextSort)
+    const suffix = params.toString()
+    api<Product[]>(`/api/products${suffix ? `?${suffix}` : ''}`)
       .then(setProducts)
       .catch((reason: unknown) => setError(reason instanceof ApiError ? reason.message : 'Не вдалося завантажити товари.'))
       .finally(() => setLoading(false))
   }
 
   useEffect(() => {
-    load()
-  }, [])
+    load(appliedQuery, sort)
+  }, [appliedQuery, sort])
 
   async function addToCart(product: Product) {
     if (!user) {
@@ -36,8 +45,8 @@ export function CatalogPage() {
     setError('')
     try {
       await api('/api/cart', {
-        method: 'PUT',
-        body: JSON.stringify({ productId: product.id, quantity: 1 }),
+        method: 'POST',
+        body: JSON.stringify({ productId: product.id }),
       })
       navigate('/cart')
     } catch (reason) {
@@ -49,10 +58,35 @@ export function CatalogPage() {
 
   return (
     <section>
-      <h1 className="mb-4 text-2xl font-semibold">Товари</h1>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Товари</h1>
+        <form className="flex flex-wrap gap-2" onSubmit={(event) => { event.preventDefault(); setAppliedQuery(query) }}>
+          <input
+            className="w-56 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm"
+            placeholder="Назва або опис"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            aria-label="Пошук товарів"
+          />
+          <Button type="submit">Знайти</Button>
+          <select
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm"
+            value={sort}
+            aria-label="Сортування"
+            onChange={(event) => setSort(event.target.value)}
+          >
+            <option value="new">Спочатку додані</option>
+            <option value="name">За назвою</option>
+            <option value="price_asc">Спочатку дешевші</option>
+            <option value="price_desc">Спочатку дорожчі</option>
+          </select>
+        </form>
+      </div>
       <ErrorText>{error}</ErrorText>
       {loading ? <p className="mt-4 text-stone-600">Завантаження…</p> : null}
-      {!loading && products.length === 0 ? <p className="mt-4 text-stone-600">Каталог порожній.</p> : null}
+      {!loading && products.length === 0 ? (
+        <p className="mt-4 text-stone-600">{appliedQuery.trim() ? 'Нічого не знайдено.' : 'Каталог порожній.'}</p>
+      ) : null}
       <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {products.map((product) => (
           <li key={product.id} className="flex flex-col rounded-xl border border-stone-200 bg-white p-4">

@@ -66,7 +66,7 @@ export function AdminProductsPage() {
   }
 
   async function remove(product: Product) {
-    if (!window.confirm(`Видалити «${product.name}»? Відгуки й позиції в кошиках зникнуть. Замовлення залишаться.`))
+    if (!window.confirm(`Видалити «${product.name}»? Відгуки й позиції в кошиках зникнуть. Товар із незавершеного замовлення видалити не можна.`))
       return
     setError('')
     try {

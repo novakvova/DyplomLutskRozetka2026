@@ -72,6 +72,30 @@ public class BuyerApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Add_to_cart_increases_quantity_instead_of_resetting_it()
+    {
+        var (client, productId) = await AuthorizedClientWithProduct("cart@example.com", stock: 5);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/cart", new { productId })).StatusCode);
+        var second = await client.PostAsJsonAsync("/api/cart", new { productId });
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var cart = await second.Content.ReadFromJsonAsync<CartBody>();
+        Assert.Equal(2, cart?.Items.Single().Quantity);
+    }
+
+    [Fact]
+    public async Task Catalog_search_matches_name()
+    {
+        await AuthorizedClientWithProduct("search@example.com", stock: 4);
+        var response = await _client.GetAsync("/api/products?query=Тестовий&sort=name");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var products = await response.Content.ReadFromJsonAsync<List<ProductJson>>();
+        Assert.Contains(products!, item => item.Name.Contains("Тестовий", StringComparison.OrdinalIgnoreCase));
+
+        var empty = await _client.GetFromJsonAsync<List<ProductJson>>("/api/products?query=неіснуючий-товар");
+        Assert.Empty(empty!);
+    }
+
+    [Fact]
     public async Task Checkout_reduces_stock_and_cancel_returns_it()
     {
         var (client, productId) = await AuthorizedClientWithProduct("stock@example.com", stock: 2);
@@ -180,6 +204,9 @@ public class BuyerApiTests : IAsyncLifetime
     private sealed record AuthBody(string AccessToken);
     private sealed record MessageBody(string Message, string? ResetUrl);
     private sealed record OrderBody(int Id, string Status);
+    private sealed record CartBody(List<CartLineBody> Items);
+    private sealed record CartLineBody(int Quantity);
+    private sealed record ProductJson(int Id, string Name);
 }
 
 public sealed class ApiFactory : WebApplicationFactory<Program>

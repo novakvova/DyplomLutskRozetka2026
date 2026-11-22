@@ -93,28 +93,38 @@ public class OrderService(AppDbContext db)
     public async Task<OrderResponse> CancelAsync(int userId, int orderId, CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var order = await db.Orders
-            .Include(item => item.Items)
-            .SingleOrDefaultAsync(item => item.Id == orderId && item.UserId == userId, cancellationToken)
-            ?? throw new AppException(StatusCodes.Status404NotFound, "Замовлення не знайдено.");
+        var claimed = await db.Orders
+            .Where(item => item.Id == orderId && item.UserId == userId
+                && (item.Status == OrderStatus.New || item.Status == OrderStatus.AwaitingPayment))
+            .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Status, OrderStatus.Cancelled), cancellationToken);
 
-        if (order.Status is not (OrderStatus.New or OrderStatus.AwaitingPayment))
-            throw new AppException(StatusCodes.Status400BadRequest, "Це замовлення вже не можна скасувати.");
+        if (claimed == 0)
+        {
+            var exists = await db.Orders.AnyAsync(item => item.Id == orderId && item.UserId == userId, cancellationToken);
+            throw new AppException(
+                exists ? StatusCodes.Status400BadRequest : StatusCodes.Status404NotFound,
+                exists ? "Це замовлення вже не можна скасувати." : "Замовлення не знайдено.");
+        }
 
-        var productIds = order.Items.Select(item => item.ProductId).Distinct().ToList();
+        await RestoreStockAsync(orderId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return await GetAsync(userId, orderId, cancellationToken);
+    }
+
+    private async Task RestoreStockAsync(int orderId, CancellationToken cancellationToken)
+    {
+        var items = await db.OrderItems.Where(item => item.OrderId == orderId).ToListAsync(cancellationToken);
+        var productIds = items.Select(item => item.ProductId).Distinct().ToList();
         var products = await db.Products
             .Where(product => productIds.Contains(product.Id))
             .ToDictionaryAsync(product => product.Id, cancellationToken);
-        foreach (var item in order.Items)
+        foreach (var item in items)
         {
             if (products.TryGetValue(item.ProductId, out var product))
                 product.Stock += item.Quantity;
         }
 
-        order.Status = OrderStatus.Cancelled;
         await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return Map(order);
     }
 
     private IQueryable<CustomerOrder> Query(int userId) =>
