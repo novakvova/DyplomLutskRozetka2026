@@ -7,7 +7,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<Category> Categories => Set<Category>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+    public DbSet<ProductCharacteristic> ProductCharacteristics => Set<ProductCharacteristic>();
     public DbSet<CartItem> CartItems => Set<CartItem>();
     public DbSet<Favorite> Favorites => Set<Favorite>();
     public DbSet<CustomerOrder> Orders => Set<CustomerOrder>();
@@ -38,11 +41,43 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<Category>(entity =>
+        {
+            entity.Property(category => category.Name).HasMaxLength(80);
+            entity.HasIndex(category => category.Name).IsUnique();
+        });
+
         modelBuilder.Entity<Product>(entity =>
         {
             entity.Property(product => product.Name).HasMaxLength(160);
             entity.Property(product => product.ShortDescription).HasMaxLength(1000);
+            entity.Property(product => product.FullDescription).HasMaxLength(4000);
+            entity.Property(product => product.ManufacturerUrl).HasMaxLength(300);
+            entity.Property(product => product.ImageUrl).HasMaxLength(300);
             entity.Property(product => product.Price).HasPrecision(12, 2);
+            entity.HasOne(product => product.Category)
+                .WithMany(category => category.Products)
+                .HasForeignKey(product => product.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductImage>(entity =>
+        {
+            entity.Property(image => image.Url).HasMaxLength(300);
+            entity.HasOne(image => image.Product)
+                .WithMany(product => product.Images)
+                .HasForeignKey(image => image.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ProductCharacteristic>(entity =>
+        {
+            entity.Property(item => item.Name).HasMaxLength(80);
+            entity.Property(item => item.Value).HasMaxLength(200);
+            entity.HasOne(item => item.Product)
+                .WithMany(product => product.Characteristics)
+                .HasForeignKey(item => item.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<CartItem>(entity =>

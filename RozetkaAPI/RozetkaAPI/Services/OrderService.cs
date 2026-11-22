@@ -6,7 +6,7 @@ using RozetkaAPI.Entities;
 
 namespace RozetkaAPI.Services;
 
-public class OrderService(AppDbContext db)
+public class OrderService(AppDbContext db, PaymentService payments, OrderNotifier notifier)
 {
     private static readonly HashSet<string> DeliveryMethods = ["nova_poshta", "ukrposhta", "pickup"];
     private static readonly HashSet<string> PaymentMethods = ["cash_on_delivery", "card"];
@@ -108,7 +108,71 @@ public class OrderService(AppDbContext db)
 
         await RestoreStockAsync(orderId, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return await GetAsync(userId, orderId, cancellationToken);
+        var cancelled = await db.Orders.Include(item => item.User).Include(item => item.Items)
+            .SingleAsync(item => item.Id == orderId, cancellationToken);
+        await notifier.NotifyStatusAsync(cancelled, cancellationToken);
+        return Map(cancelled);
+    }
+
+    public async Task<PaymentStartResponse> PayAsync(int userId, int orderId, CancellationToken cancellationToken)
+    {
+        var order = await db.Orders
+            .Include(item => item.User)
+            .Include(item => item.Items)
+            .SingleOrDefaultAsync(item => item.Id == orderId && item.UserId == userId, cancellationToken)
+            ?? throw new AppException(StatusCodes.Status404NotFound, "Замовлення не знайдено.");
+        if (order.PaymentMethod != "card")
+            throw new AppException(StatusCodes.Status400BadRequest, "Це замовлення не оплачується карткою.");
+        if (order.Status != OrderStatus.AwaitingPayment)
+            throw new AppException(StatusCodes.Status400BadRequest, "Це замовлення вже не очікує оплату.");
+
+        if (payments.LiqPayConfigured)
+        {
+            var (data, signature) = payments.CreateCheckout(order);
+            return new PaymentStartResponse(
+                "liqpay",
+                "Далі відкриється сторінка LiqPay. Номер картки вводиться лише там.",
+                data,
+                signature,
+                null);
+        }
+
+        var claimed = await db.Orders
+            .Where(item => item.Id == orderId && item.Status == OrderStatus.AwaitingPayment)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Status, OrderStatus.Processing), cancellationToken);
+        if (claimed == 0)
+            throw new AppException(StatusCodes.Status400BadRequest, "Статус замовлення вже змінився.");
+
+        order.Status = OrderStatus.Processing;
+        await notifier.NotifyStatusAsync(order, cancellationToken);
+        return new PaymentStartResponse(
+            "demo",
+            "Це демо-оплата: гроші не списуються. Замовлення передано в обробку.",
+            null,
+            null,
+            Map(order));
+    }
+
+    public async Task ConfirmLiqPayAsync(string? data, string? signature, CancellationToken cancellationToken)
+    {
+        if (!payments.SignatureMatches(data, signature))
+            throw new AppException(StatusCodes.Status400BadRequest, "Підпис LiqPay не збігається.");
+
+        var status = payments.StatusFromData(data!);
+        if (status is not ("success" or "sandbox" or "wait_accept"))
+            return;
+
+        var orderId = payments.OrderIdFromData(data!)
+            ?? throw new AppException(StatusCodes.Status400BadRequest, "У відповіді LiqPay немає номера замовлення.");
+        var claimed = await db.Orders
+            .Where(item => item.Id == orderId && item.Status == OrderStatus.AwaitingPayment)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Status, OrderStatus.Processing), cancellationToken);
+        if (claimed == 0)
+            return;
+
+        var order = await db.Orders.Include(item => item.User).Include(item => item.Items)
+            .SingleAsync(item => item.Id == orderId, cancellationToken);
+        await notifier.NotifyStatusAsync(order, cancellationToken);
     }
 
     private async Task RestoreStockAsync(int orderId, CancellationToken cancellationToken)

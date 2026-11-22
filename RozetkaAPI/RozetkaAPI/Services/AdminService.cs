@@ -6,16 +6,16 @@ using RozetkaAPI.Entities;
 
 namespace RozetkaAPI.Services;
 
-public class AdminService(AppDbContext db)
+public class AdminService(AppDbContext db, OrderNotifier notifier)
 {
     public async Task<ProductListItemResponse> CreateProductAsync(int userId, SaveProductRequest request, CancellationToken cancellationToken)
     {
         await EnsureAdminAsync(userId, cancellationToken);
         var product = new Product { CreatedAt = DateTime.UtcNow };
-        ApplyProduct(product, request);
+        await ApplyProductAsync(product, request, cancellationToken);
         db.Products.Add(product);
         await db.SaveChangesAsync(cancellationToken);
-        return MapProduct(product);
+        return await MapProductAsync(product.Id, cancellationToken);
     }
 
     public async Task<ProductListItemResponse> UpdateProductAsync(int userId, int productId, SaveProductRequest request, CancellationToken cancellationToken)
@@ -23,9 +23,9 @@ public class AdminService(AppDbContext db)
         await EnsureAdminAsync(userId, cancellationToken);
         var product = await db.Products.SingleOrDefaultAsync(item => item.Id == productId, cancellationToken)
             ?? throw new AppException(StatusCodes.Status404NotFound, "Товар не знайдено.");
-        ApplyProduct(product, request);
+        await ApplyProductAsync(product, request, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        return MapProduct(product);
+        return await MapProductAsync(product.Id, cancellationToken);
     }
 
     public async Task DeleteProductAsync(int userId, int productId, CancellationToken cancellationToken)
@@ -84,13 +84,69 @@ public class AdminService(AppDbContext db)
             order.Status = OrderStatus.Cancelled;
             await RestoreStockAsync(order, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            await notifier.NotifyStatusAsync(order, cancellationToken);
             return MapOrder(order);
         }
 
         order.Status = status;
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        await notifier.NotifyStatusAsync(order, cancellationToken);
         return MapOrder(order);
+    }
+
+    public async Task<IReadOnlyList<CategoryResponse>> ListCategoriesAsync(int userId, CancellationToken cancellationToken)
+    {
+        await EnsureAdminAsync(userId, cancellationToken);
+        return await db.Categories
+            .OrderBy(category => category.Name)
+            .Select(category => new CategoryResponse(category.Id, category.Name))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<CategoryResponse> CreateCategoryAsync(int userId, string name, CancellationToken cancellationToken)
+    {
+        await EnsureAdminAsync(userId, cancellationToken);
+        var category = new Category { Name = CategoryName(name) };
+        if (await db.Categories.AnyAsync(item => item.Name == category.Name, cancellationToken))
+            throw new AppException(StatusCodes.Status409Conflict, "Така категорія вже є.");
+        db.Categories.Add(category);
+        await db.SaveChangesAsync(cancellationToken);
+        return new CategoryResponse(category.Id, category.Name);
+    }
+
+    public async Task<CategoryResponse> UpdateCategoryAsync(int userId, int categoryId, string name, CancellationToken cancellationToken)
+    {
+        await EnsureAdminAsync(userId, cancellationToken);
+        var category = await db.Categories.SingleOrDefaultAsync(item => item.Id == categoryId, cancellationToken)
+            ?? throw new AppException(StatusCodes.Status404NotFound, "Категорію не знайдено.");
+        category.Name = CategoryName(name);
+        if (await db.Categories.AnyAsync(item => item.Id != categoryId && item.Name == category.Name, cancellationToken))
+            throw new AppException(StatusCodes.Status409Conflict, "Така категорія вже є.");
+        await db.SaveChangesAsync(cancellationToken);
+        return new CategoryResponse(category.Id, category.Name);
+    }
+
+    public async Task DeleteCategoryAsync(int userId, int categoryId, CancellationToken cancellationToken)
+    {
+        await EnsureAdminAsync(userId, cancellationToken);
+        var category = await db.Categories.SingleOrDefaultAsync(item => item.Id == categoryId, cancellationToken)
+            ?? throw new AppException(StatusCodes.Status404NotFound, "Категорію не знайдено.");
+        if (await db.Products.AnyAsync(product => product.CategoryId == categoryId, cancellationToken))
+            throw new AppException(StatusCodes.Status409Conflict, "У категорії ще є товари. Спочатку перенесіть або видаліть їх.");
+        db.Categories.Remove(category);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<AdminProductResponse> GetProductAsync(int userId, int productId, CancellationToken cancellationToken)
+    {
+        await EnsureAdminAsync(userId, cancellationToken);
+        var product = await db.Products
+            .Include(item => item.Images)
+            .Include(item => item.Characteristics)
+            .SingleOrDefaultAsync(item => item.Id == productId, cancellationToken)
+            ?? throw new AppException(StatusCodes.Status404NotFound, "Товар не знайдено.");
+        return MapAdminProduct(product);
     }
 
     public async Task<IReadOnlyList<AdminUserResponse>> ListUsersAsync(int userId, CancellationToken cancellationToken)
@@ -168,17 +224,59 @@ public class AdminService(AppDbContext db)
             throw new AppException(StatusCodes.Status403Forbidden, "Ця дія доступна лише адміністратору.");
     }
 
-    private static void ApplyProduct(Product product, SaveProductRequest request)
+    private async Task ApplyProductAsync(Product product, SaveProductRequest request, CancellationToken cancellationToken)
     {
         product.Name = InputRules.RequiredText(request.Name, "Назва", 160);
         product.ShortDescription = InputRules.RequiredText(request.ShortDescription, "Короткий опис", 1000);
+        product.FullDescription = InputRules.OptionalText(request.FullDescription, "Повний опис", 4000);
         if (request.Price <= 0 || request.Price > 10_000_000)
             throw new AppException(StatusCodes.Status400BadRequest, "Ціна має бути більшою за 0.");
         if (request.Stock < 0 || request.Stock > 1_000_000)
             throw new AppException(StatusCodes.Status400BadRequest, "Кількість на складі не може бути від’ємною.");
+        if (!await db.Categories.AnyAsync(category => category.Id == request.CategoryId, cancellationToken))
+            throw new AppException(StatusCodes.Status400BadRequest, "Оберіть категорію.");
+
         product.Price = request.Price;
         product.Stock = request.Stock;
+        product.CategoryId = request.CategoryId;
+        product.ManufacturerUrl = InputRules.WebAddress(request.ManufacturerUrl);
+
+        var images = (request.ImageUrls ?? [])
+            .Select(url => url?.Trim() ?? "")
+            .Where(url => url.Length > 0)
+            .Distinct()
+            .Take(8)
+            .ToList();
+        if (images.Any(url => url.Length > 300 || !(url.StartsWith('/') || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))))
+            throw new AppException(StatusCodes.Status400BadRequest, "Фото має бути посиланням http(s) або файлом магазину.");
+
+        var specs = (request.Characteristics ?? [])
+            .Select(item => new CharacteristicInput(
+                InputRules.OptionalText(item.Name, "Назва характеристики", 80),
+                InputRules.OptionalText(item.Value, "Значення характеристики", 200)))
+            .Where(item => item.Name.Length > 0 && item.Value.Length > 0)
+            .Take(20)
+            .ToList();
+
+        if (product.Id != 0)
+        {
+            var oldImages = await db.ProductImages.Where(image => image.ProductId == product.Id).ToListAsync(cancellationToken);
+            var oldSpecs = await db.ProductCharacteristics.Where(item => item.ProductId == product.Id).ToListAsync(cancellationToken);
+            db.ProductImages.RemoveRange(oldImages);
+            db.ProductCharacteristics.RemoveRange(oldSpecs);
+        }
+
+        product.ImageUrl = images.FirstOrDefault();
+        product.Images = images.Select((url, index) => new ProductImage { Url = url, SortOrder = index }).ToList();
+        product.Characteristics = specs.Select((item, index) => new ProductCharacteristic
+        {
+            Name = item.Name,
+            Value = item.Value,
+            SortOrder = index
+        }).ToList();
     }
+
+    private static string CategoryName(string? name) => InputRules.RequiredText(name, "Назва категорії", 80);
 
     private async Task RestoreStockAsync(CustomerOrder order, CancellationToken cancellationToken)
     {
@@ -195,14 +293,44 @@ public class AdminService(AppDbContext db)
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static ProductListItemResponse MapProduct(Product product) => new(
-        product.Id,
-        product.Name,
-        product.ShortDescription,
-        product.Price,
-        product.Stock,
-        null,
-        0);
+    private async Task<ProductListItemResponse> MapProductAsync(int productId, CancellationToken cancellationToken)
+    {
+        return await db.Products
+            .Where(product => product.Id == productId)
+            .Select(product => new ProductListItemResponse(
+                product.Id,
+                product.Name,
+                product.ShortDescription,
+                product.Price,
+                product.Stock,
+                null,
+                0,
+                product.CategoryId,
+                product.Category.Name,
+                product.ImageUrl))
+            .SingleAsync(cancellationToken);
+    }
+
+    private static AdminProductResponse MapAdminProduct(Product product)
+    {
+        var images = product.Images.OrderBy(image => image.SortOrder).Select(image => image.Url).ToList();
+        if (images.Count == 0 && !string.IsNullOrWhiteSpace(product.ImageUrl))
+            images.Add(product.ImageUrl);
+        return new AdminProductResponse(
+            product.Id,
+            product.Name,
+            product.ShortDescription,
+            product.FullDescription,
+            product.Price,
+            product.Stock,
+            product.CategoryId,
+            product.ManufacturerUrl,
+            images,
+            product.Characteristics
+                .OrderBy(item => item.SortOrder)
+                .Select(item => new CharacteristicInput(item.Name, item.Value))
+                .ToList());
+    }
 
     private static AdminOrderResponse MapOrder(CustomerOrder order) => new(
         order.Id,

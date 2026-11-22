@@ -56,7 +56,10 @@ public class AdminApiTests : IAsyncLifetime
         }
 
         var adminClient = Client(buyerAuth.AccessToken);
-        var created = await adminClient.PostAsJsonAsync("/api/admin/products", ProductBody("Адмінський товар", 3));
+        var categoryResponse = await adminClient.PostAsJsonAsync("/api/admin/categories", new { name = "Тестова" });
+        Assert.Equal(HttpStatusCode.OK, categoryResponse.StatusCode);
+        var category = await categoryResponse.Content.ReadFromJsonAsync<CategoryJson>();
+        var created = await adminClient.PostAsJsonAsync("/api/admin/products", ProductBody("Адмінський товар", 3, category!.Id));
         Assert.Equal(HttpStatusCode.OK, created.StatusCode);
         var product = await created.Content.ReadFromJsonAsync<ProductJson>();
 
@@ -91,6 +94,9 @@ public class AdminApiTests : IAsyncLifetime
         var promoted = await adminClient.PutAsJsonAsync($"/api/admin/users/{adminId}/role", new { role = "Admin" });
         Assert.Equal(HttpStatusCode.BadRequest, promoted.StatusCode);
 
+        var blockedCategory = await adminClient.DeleteAsync($"/api/admin/categories/{category.Id}");
+        Assert.Equal(HttpStatusCode.Conflict, blockedCategory.StatusCode);
+
         var removed = await adminClient.DeleteAsync($"/api/admin/products/{product.Id}");
         Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
     }
@@ -102,15 +108,21 @@ public class AdminApiTests : IAsyncLifetime
         return client;
     }
 
-    private static object ProductBody(string name, int stock) => new
+    private static object ProductBody(string name, int stock, int categoryId = 1) => new
     {
         name,
         shortDescription = "Короткий опис для адмінки",
+        fullDescription = "Повний опис тестового товару.",
         price = 150,
-        stock
+        stock,
+        categoryId,
+        manufacturerUrl = "https://example.com/item",
+        imageUrls = new[] { "/products/phone.svg" },
+        characteristics = new[] { new { name = "Колір", value = "Чорний" } }
     };
 
     private sealed record AuthBody(string AccessToken);
     private sealed record ProductJson(int Id, int Stock);
+    private sealed record CategoryJson(int Id);
     private sealed record OrderBody(int Id);
 }

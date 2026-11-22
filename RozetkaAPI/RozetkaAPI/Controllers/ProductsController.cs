@@ -14,8 +14,12 @@ public class ProductsController(CatalogService catalog, ReviewService reviews) :
     public async Task<IReadOnlyList<ProductListItemResponse>> List(
         [FromQuery] string? query,
         [FromQuery] string? sort,
+        [FromQuery] int? categoryId,
+        [FromQuery] decimal? minPrice,
+        [FromQuery] decimal? maxPrice,
+        [FromQuery] string? ids,
         CancellationToken cancellationToken) =>
-        await catalog.ListAsync(query, sort, cancellationToken);
+        await catalog.ListAsync(query, sort, categoryId, minPrice, maxPrice, ids, cancellationToken);
 
     [HttpGet("{id:int}")]
     public async Task<ProductDetailsResponse> Get(int id, CancellationToken cancellationToken) =>

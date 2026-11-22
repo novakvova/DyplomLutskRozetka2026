@@ -47,6 +47,8 @@ export function Layout() {
           <Link to="/" className="text-xl font-semibold text-brand-900">Rozetka</Link>
           <nav className="flex flex-1 flex-wrap items-center gap-1 text-sm">
             <NavLink to="/" className={linkClass} end>Товари</NavLink>
+            <NavLink to="/compare" className={linkClass}>Порівняння</NavLink>
+            <NavLink to="/recent" className={linkClass}>Переглянуті</NavLink>
             {user && (
               <>
                 <NavLink to="/cart" className={linkClass}>Кошик{cartCount > 0 ? ` (${cartCount})` : ''}</NavLink>

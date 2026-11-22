@@ -9,6 +9,7 @@ export default defineConfig({
     port: 43123,
     proxy: {
       '/api': 'http://127.0.0.1:5224',
+      '/uploads': 'http://127.0.0.1:5224',
     },
   },
 })

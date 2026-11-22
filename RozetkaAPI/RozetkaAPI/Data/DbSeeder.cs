@@ -26,60 +26,81 @@ public static class DbSeeder
             await db.SaveChangesAsync();
         }
 
+        foreach (var name in new[] { "Смартфони", "Ноутбуки", "Аудіо", "Побутова техніка" })
+        {
+            if (!await db.Categories.AnyAsync(category => category.Name == name))
+                db.Categories.Add(new Category { Name = name });
+        }
+
+        await db.SaveChangesAsync();
+
         if (await db.Products.AnyAsync())
             return;
 
+        var categories = await db.Categories.ToDictionaryAsync(category => category.Name);
         var products = new List<Product>
         {
-            new()
-            {
-                Name = "Смартфон Nova X 128 ГБ",
-                ShortDescription = "Екран 6,5 дюйма, 128 ГБ пам’яті і батарея на день без підзарядки.",
-                Price = 18999,
-                Stock = 12
-            },
-            new()
-            {
-                Name = "Ноутбук StudyBook 15",
-                ShortDescription = "15-дюймовий ноутбук для навчання: 16 ГБ оперативної пам’яті і SSD на 512 ГБ.",
-                Price = 32999,
-                Stock = 5
-            },
-            new()
-            {
-                Name = "Навушники SoundMini",
-                ShortDescription = "Бездротові навушники з шумозаглушенням і кейсом на 24 години роботи.",
-                Price = 2499,
-                Stock = 30
-            },
-            new()
-            {
-                Name = "Пральна машина CleanHome 7 кг",
-                ShortDescription = "Вузька машина на 7 кг із швидким циклом і віджимом до 1200 обертів.",
-                Price = 16499,
-                Stock = 4
-            },
-            new()
-            {
-                Name = "Електрочайник Glass 1,7 л",
-                ShortDescription = "Скляний чайник з підсвіткою і захистом від увімкнення без води.",
-                Price = 899,
-                Stock = 18
-            },
-            new()
-            {
-                Name = "Робот-пилосос HomeRun S8",
-                ShortDescription = "Прибирає сухе сміття і будує карту кімнати. Зараз позиції немає на складі.",
-                Price = 12999,
-                Stock = 0
-            }
+            Product(categories["Смартфони"], "Смартфон Nova X 128 ГБ",
+                "Екран 6,5 дюйма, 128 ГБ пам’яті і батарея на день без підзарядки.",
+                "Nova X розрахований на щоденне користування: дзвінки, месенджери і фото при денному світлі. Корпус не ковзає, а зарядки вистачає від ранку до вечора.",
+                18999, 11, "/products/phone.svg", "https://example.com/nova",
+                [("Екран", "6,5 дюйма"), ("Пам’ять", "128 ГБ"), ("Батарея", "5000 мА·год")]),
+            Product(categories["Ноутбуки"], "Ноутбук StudyBook 15",
+                "15-дюймовий ноутбук для навчання: 16 ГБ оперативної пам’яті і SSD на 512 ГБ.",
+                "StudyBook тримає кілька вкладок, редактор і відеодзвінок одночасно. Клавіатура з підсвіткою, вага дозволяє носити його на пари.",
+                32999, 5, "/products/laptop.svg", "https://example.com/studybook",
+                [("Екран", "15,6 дюйма"), ("Пам’ять", "16 ГБ"), ("Накопичувач", "SSD 512 ГБ")]),
+            Product(categories["Аудіо"], "Навушники SoundMini",
+                "Бездротові навушники з шумозаглушенням і кейсом на 24 години роботи.",
+                "SoundMini прибирають шум транспорту і тримають заряд разом із кейсом добу. Керування гучністю на корпусі.",
+                2499, 30, "/products/headphones.svg", "https://example.com/soundmini",
+                [("Тип", "Вкладні"), ("Зв’язок", "Bluetooth"), ("Час роботи", "24 години з кейсом")]),
+            Product(categories["Побутова техніка"], "Пральна машина CleanHome 7 кг",
+                "Вузька машина на 7 кг із швидким циклом і віджимом до 1200 обертів.",
+                "CleanHome ставиться у вузьку нішу. Швидкий цикл підходить для щоденних речей, віджим не лишає білизну мокрою.",
+                16499, 4, "/products/washer.svg", "https://example.com/cleanhome",
+                [("Завантаження", "7 кг"), ("Віджим", "1200 об/хв"), ("Глибина", "40 см")]),
+            Product(categories["Побутова техніка"], "Електрочайник Glass 1,7 л",
+                "Скляний чайник з підсвіткою і захистом від увімкнення без води.",
+                "Glass кип’ятить 1,7 літра і вимикається, якщо води немає. Підсвітка видно, скільки води лишилось.",
+                899, 18, "/products/kettle.svg", "https://example.com/glass",
+                [("Об’єм", "1,7 л"), ("Потужність", "2200 Вт"), ("Матеріал", "Скло")]),
+            Product(categories["Побутова техніка"], "Робот-пилосос HomeRun S8",
+                "Прибирає сухе сміття і будує карту кімнати. Зараз позиції немає на складі.",
+                "HomeRun S8 об’їжджає меблі і повертається на станцію. Зараз усі одиниці розібрані.",
+                12999, 0, "/products/vacuum.svg", "https://example.com/homerun",
+                [("Прибирання", "Сухе"), ("Навігація", "Карта кімнати"), ("Станція", "Зарядна")])
         };
+        products[0].Images.Add(new ProductImage { Url = "/products/phone-back.svg", SortOrder = 1 });
 
         db.Products.AddRange(products);
         await db.SaveChangesAsync();
 
         var buyer = await db.Users.SingleAsync(user => user.Email == "buyer@rozetka.test");
         var phone = products[0];
+        db.Orders.Add(new CustomerOrder
+        {
+            UserId = buyer.Id,
+            Status = OrderStatus.Completed,
+            RecipientName = "Олена Коваль",
+            Phone = "+380501112233",
+            City = "Луцьк",
+            DeliveryMethod = "nova_poshta",
+            DeliveryAddress = "Відділення №3",
+            PaymentMethod = "cash_on_delivery",
+            Total = phone.Price,
+            CreatedAt = DateTime.UtcNow.AddDays(-6),
+            Items =
+            [
+                new OrderItem
+                {
+                    ProductId = phone.Id,
+                    ProductName = phone.Name,
+                    UnitPrice = phone.Price,
+                    Quantity = 1
+                }
+            ]
+        });
         db.Reviews.Add(new Review
         {
             UserId = buyer.Id,
@@ -90,6 +111,34 @@ public static class DbSeeder
         });
         await db.SaveChangesAsync();
     }
+
+    private static Product Product(
+        Category category,
+        string name,
+        string summary,
+        string description,
+        decimal price,
+        int stock,
+        string image,
+        string manufacturer,
+        (string Name, string Value)[] specs) => new()
+    {
+        Category = category,
+        Name = name,
+        ShortDescription = summary,
+        FullDescription = description,
+        Price = price,
+        Stock = stock,
+        ImageUrl = image,
+        ManufacturerUrl = manufacturer,
+        Images = [new ProductImage { Url = image, SortOrder = 0 }],
+        Characteristics = specs.Select((spec, index) => new ProductCharacteristic
+        {
+            Name = spec.Name,
+            Value = spec.Value,
+            SortOrder = index
+        }).ToList()
+    };
 
     private static User CreateUser(
         IPasswordHasher<User> hasher,

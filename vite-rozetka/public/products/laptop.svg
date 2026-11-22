@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <rect width="120" height="120" rx="16" fill="#dcfce7"/>
+  <path d="M28 40 h64 v36 h-64 z M20 78 h80 v6 h-80 z" fill="none" stroke="#1c1917" stroke-width="4" stroke-linejoin="round"/>
+  <text x="60" y="108" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#44403c">Ноутбук</text>
+</svg>

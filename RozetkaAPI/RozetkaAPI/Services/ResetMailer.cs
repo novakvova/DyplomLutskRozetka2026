@@ -8,7 +8,14 @@ public class ResetMailer(IConfiguration configuration, ILogger<ResetMailer> logg
 {
     public bool IsConfigured => !string.IsNullOrWhiteSpace(configuration["Smtp:Host"]);
 
-    public async Task SendAsync(string email, string resetUrl, CancellationToken cancellationToken)
+    public Task SendAsync(string email, string resetUrl, CancellationToken cancellationToken) =>
+        SendPlainAsync(
+            email,
+            "Відновлення пароля",
+            $"Щоб задати новий пароль, відкрийте посилання. Воно діє одну годину:\n{resetUrl}",
+            cancellationToken);
+
+    public async Task SendPlainAsync(string email, string subject, string body, CancellationToken cancellationToken)
     {
         var host = configuration["Smtp:Host"] ?? "";
         var port = configuration.GetValue("Smtp:Port", 587);
@@ -20,8 +27,8 @@ public class ResetMailer(IConfiguration configuration, ILogger<ResetMailer> logg
 
         using var message = new MailMessage(from, email)
         {
-            Subject = "Відновлення пароля",
-            Body = $"Щоб задати новий пароль, відкрийте посилання. Воно діє одну годину:\n{resetUrl}"
+            Subject = subject,
+            Body = body
         };
 
 #pragma warning disable SYSLIB0014

@@ -13,6 +13,12 @@ public class ReviewService(AppDbContext db)
         if (!await db.Products.AnyAsync(product => product.Id == productId, cancellationToken))
             throw new AppException(StatusCodes.Status404NotFound, "Товар не знайдено.");
 
+        var purchased = await db.OrderItems.AnyAsync(
+            item => item.ProductId == productId && item.Order.UserId == userId && item.Order.Status != OrderStatus.Cancelled,
+            cancellationToken);
+        if (!purchased)
+            throw new AppException(StatusCodes.Status400BadRequest, "Відгук можна залишити після покупки цього товару.");
+
         if (await db.Reviews.AnyAsync(review => review.UserId == userId && review.ProductId == productId, cancellationToken))
             throw new AppException(StatusCodes.Status409Conflict, "Ви вже залишили відгук про цей товар.");
 

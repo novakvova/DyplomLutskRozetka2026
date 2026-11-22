@@ -42,10 +42,13 @@ export function FavoritesPage() {
       <ul className="space-y-3">
         {items.map((item) => (
           <li key={item.productId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white p-4">
-            <div>
+            <div className="flex items-center gap-3">
+              {item.imageUrl ? <img src={item.imageUrl} alt="" className="h-14 w-14 rounded-lg bg-stone-100 object-contain" /> : null}
+              <div>
               <Link className="font-medium hover:text-brand-800" to={`/products/${item.productId}`}>{item.name}</Link>
               <p className="text-sm text-stone-600">{item.shortDescription}</p>
               <p className="mt-1 font-medium">{formatMoney(item.price)}</p>
+              </div>
             </div>
             <button type="button" className="text-sm text-red-700" onClick={() => void remove(item.productId)}>Прибрати</button>
           </li>

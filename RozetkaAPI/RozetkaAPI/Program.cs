@@ -44,6 +44,10 @@ else
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddSingleton<ResetMailer>();
+builder.Services.AddSingleton<PaymentService>();
+builder.Services.AddScoped<OrderNotifier>();
+builder.Services.AddHttpClient("novaposhta", client => client.BaseAddress = new Uri("https://api.novaposhta.ua/v2.0/json/"));
+builder.Services.AddScoped<DeliveryService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<CartService>();
@@ -138,6 +142,7 @@ app.UseExceptionHandler(handler =>
 
 app.UseSwagger();
 app.UseSwaggerUI();
+app.UseStaticFiles();
 app.UseCors("web");
 app.UseAuthentication();
 app.UseAuthorization();

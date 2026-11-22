@@ -18,7 +18,8 @@ public class FavoriteService(AppDbContext db)
                 favorite.Product.Name,
                 favorite.Product.ShortDescription,
                 favorite.Product.Price,
-                favorite.Product.Stock))
+                favorite.Product.Stock,
+                favorite.Product.ImageUrl))
             .ToListAsync(cancellationToken);
     }
 
