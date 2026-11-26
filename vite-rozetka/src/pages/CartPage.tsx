@@ -46,9 +46,9 @@ export function CartPage() {
       ) : null}
       <ul className="space-y-3">
         {cart?.items.map((item) => (
-          <li key={item.productId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white p-4">
+          <li key={item.productId} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm">
             <div>
-              <Link className="font-medium hover:text-brand-800" to={`/products/${item.productId}`}>{item.name}</Link>
+              <Link className="font-medium hover:text-brand-700" to={`/products/${item.productId}`}>{item.name}</Link>
               <p className="text-sm text-stone-500">{formatMoney(item.unitPrice)} · на складі {item.stock}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -73,7 +73,7 @@ export function CartPage() {
       </ul>
       {cart && cart.items.length > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xl font-semibold">Разом {formatMoney(cart.total)}</p>
+          <p className="text-xl font-bold text-brand-700">Разом {formatMoney(cart.total)}</p>
           <Link to="/checkout"><Button type="button">Оформити замовлення</Button></Link>
         </div>
       ) : null}

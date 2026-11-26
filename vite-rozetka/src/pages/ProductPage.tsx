@@ -117,16 +117,16 @@ export function ProductPage() {
   return (
     <article className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div>
-        <Link to="/" className="text-sm text-brand-800">До товарів</Link>
+        <Link to="/" className="text-sm text-brand-700">До каталогу</Link>
         <p className="mt-2 text-sm text-stone-500">{product.categoryName}</p>
         <h1 className="mt-1 text-2xl font-semibold">{product.name}</h1>
         {product.images.length > 0 ? (
           <div className="mt-4">
-            <img src={product.images[photo] ?? product.images[0]} alt={product.name} className="h-64 w-full rounded-xl border border-stone-200 bg-stone-100 object-contain" />
+            <img src={product.images[photo] ?? product.images[0]} alt={product.name} className="h-72 w-full rounded-2xl bg-cream object-contain p-4" />
             {product.images.length > 1 ? (
               <div className="mt-2 flex gap-2">
                 {product.images.map((image, index) => (
-                  <button key={image} type="button" className={`h-14 w-14 overflow-hidden rounded-lg border ${index === photo ? 'border-brand-800' : 'border-stone-200'}`} onClick={() => setPhoto(index)}>
+                  <button key={image} type="button" className={`h-14 w-14 overflow-hidden rounded-lg border bg-cream ${index === photo ? 'border-brand-700' : 'border-stone-200'}`} onClick={() => setPhoto(index)}>
                     <img src={image} alt="" className="h-full w-full object-contain" />
                   </button>
                 ))}
@@ -149,7 +149,7 @@ export function ProductPage() {
           </table>
         ) : null}
         {product.manufacturerUrl ? (
-          <a className="mt-3 inline-block text-sm text-brand-800 hover:underline" href={product.manufacturerUrl} target="_blank" rel="noreferrer">
+          <a className="mt-3 inline-block text-sm text-brand-700 hover:underline" href={product.manufacturerUrl} target="_blank" rel="noreferrer">
             Сайт виробника
           </a>
         ) : null}
@@ -184,9 +184,9 @@ export function ProductPage() {
           )}
         </section>
       </div>
-      <aside className="h-fit rounded-xl border border-stone-200 bg-white p-4">
-        <p className="text-2xl font-semibold">{formatMoney(product.price)}</p>
-        <p className="mt-1 text-sm text-stone-500">{product.stock > 0 ? `В наявності: ${product.stock}` : 'Немає в наявності'}</p>
+      <aside className="h-fit rounded-2xl bg-white p-5 shadow-sm">
+        <p className="text-3xl font-bold text-brand-700">{formatMoney(product.price)}</p>
+        <p className={`mt-1 text-sm font-medium ${product.stock > 0 ? 'text-emerald-600' : 'text-stone-400'}`}>{product.stock > 0 ? `Є в наявності · ${product.stock} шт.` : 'Немає в наявності'}</p>
         <label className="mt-4 block text-sm font-medium text-stone-700">
           Кількість
           <input

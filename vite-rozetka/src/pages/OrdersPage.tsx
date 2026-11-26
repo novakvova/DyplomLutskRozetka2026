@@ -28,10 +28,10 @@ export function OrdersPage() {
       <ul className="space-y-3">
         {orders.map((order) => (
           <li key={order.id}>
-            <Link to={`/orders/${order.id}`} className="block rounded-xl border border-stone-200 bg-white p-4 hover:border-brand-700">
+            <Link to={`/orders/${order.id}`} className="block rounded-2xl bg-white p-4 shadow-sm hover:ring-1 hover:ring-brand-700">
               <p className="font-medium">Замовлення №{order.id}</p>
               <p className="text-sm text-stone-600">{formatDate(order.createdAt)} · {orderStatusLabel[order.status] ?? order.status}</p>
-              <p className="mt-1 font-semibold">{formatMoney(order.total)}</p>
+              <p className="mt-1 font-bold text-brand-700">{formatMoney(order.total)}</p>
             </Link>
           </li>
         ))}

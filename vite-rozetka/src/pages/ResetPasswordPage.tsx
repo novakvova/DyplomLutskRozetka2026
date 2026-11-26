@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api'
+import { AuthPanel } from '../components/AuthPanel'
 import { Button, ErrorText, Field } from '../components/Field'
 
 export function ResetPasswordPage() {
@@ -35,16 +36,14 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <section className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-semibold">Новий пароль</h1>
-      {!token ? <p className="text-sm text-red-700">У посиланні немає токена відновлення.</p> : null}
-      <form className="space-y-3 rounded-xl border border-stone-200 bg-white p-4" onSubmit={(event) => void onSubmit(event)}>
+    <AuthPanel title="Новий пароль" alternateTo="/login" alternateLabel="До входу">
+      {!token ? <p className="mb-3 text-sm text-red-700">У посиланні немає токена відновлення.</p> : null}
+      <form className="space-y-3" onSubmit={(event) => void onSubmit(event)}>
         <Field label="Новий пароль" name="password" type="password" autoComplete="new-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
         <Field label="Повторіть пароль" name="confirm" type="password" autoComplete="new-password" required value={confirm} onChange={(event) => setConfirm(event.target.value)} />
         <ErrorText>{error}</ErrorText>
-        <Button type="submit" disabled={busy || !token}>Зберегти пароль</Button>
+        <Button type="submit" className="w-full" disabled={busy || !token}>Зберегти пароль</Button>
       </form>
-      <p className="text-sm"><Link className="text-brand-800" to="/login">До входу</Link></p>
-    </section>
+    </AuthPanel>
   )
 }

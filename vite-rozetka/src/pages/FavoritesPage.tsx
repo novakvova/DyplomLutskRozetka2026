@@ -41,13 +41,13 @@ export function FavoritesPage() {
       {items.length === 0 ? <p className="text-stone-600">В обраному ще нічого немає.</p> : null}
       <ul className="space-y-3">
         {items.map((item) => (
-          <li key={item.productId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white p-4">
+          <li key={item.productId} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm">
             <div className="flex items-center gap-3">
-              {item.imageUrl ? <img src={item.imageUrl} alt="" className="h-14 w-14 rounded-lg bg-stone-100 object-contain" /> : null}
+              {item.imageUrl ? <img src={item.imageUrl} alt="" className="h-14 w-14 rounded-lg bg-cream object-contain" /> : null}
               <div>
-              <Link className="font-medium hover:text-brand-800" to={`/products/${item.productId}`}>{item.name}</Link>
+              <Link className="font-medium hover:text-brand-700" to={`/products/${item.productId}`}>{item.name}</Link>
               <p className="text-sm text-stone-600">{item.shortDescription}</p>
-              <p className="mt-1 font-medium">{formatMoney(item.price)}</p>
+              <p className="mt-1 font-bold text-brand-700">{formatMoney(item.price)}</p>
               </div>
             </div>
             <button type="button" className="text-sm text-red-700" onClick={() => void remove(item.productId)}>Прибрати</button>

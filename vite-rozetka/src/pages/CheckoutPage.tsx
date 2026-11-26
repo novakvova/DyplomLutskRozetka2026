@@ -74,7 +74,7 @@ export function CheckoutPage() {
 
   return (
     <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-      <form className="space-y-3 rounded-xl border border-stone-200 bg-white p-4" onSubmit={(event) => void onSubmit(event)}>
+      <form className="space-y-3 rounded-2xl bg-white p-5 shadow-sm" onSubmit={(event) => void onSubmit(event)}>
         <h1 className="text-2xl font-semibold">Оформлення замовлення</h1>
         <Field label="Ім’я та прізвище" name="recipientName" required value={form.recipientName} onChange={(event) => setForm({ ...form, recipientName: event.target.value })} />
         <Field label="Телефон" name="phone" required value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
