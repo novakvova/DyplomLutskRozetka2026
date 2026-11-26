@@ -76,7 +76,7 @@ export function Layout() {
     const next = new URLSearchParams()
     if (query.trim())
       next.set('q', query.trim())
-    navigate(`/?${next.toString()}`)
+    navigate(`/catalog?${next.toString()}`)
   }
 
   async function onLogout() {
@@ -105,13 +105,13 @@ export function Layout() {
             </button>
             {menuOpen ? (
               <div className="absolute left-0 z-20 mt-2 w-56 rounded-xl border border-stone-200 bg-white p-2 shadow-lg">
-                <Link to="/" className="block rounded-lg px-3 py-2 text-sm hover:bg-brand-50" onClick={() => setMenuOpen(false)}>
+                <Link to="/catalog" className="block rounded-lg px-3 py-2 text-sm hover:bg-brand-50" onClick={() => setMenuOpen(false)}>
                   Усі товари
                 </Link>
                 {categories.map((category) => (
                   <Link
                     key={category.id}
-                    to={`/?category=${category.id}`}
+                    to={`/catalog?category=${category.id}`}
                     className="block rounded-lg px-3 py-2 text-sm hover:bg-brand-50"
                     onClick={() => setMenuOpen(false)}
                   >
@@ -122,19 +122,21 @@ export function Layout() {
             ) : null}
           </div>
           <form className="flex min-w-[220px] flex-1 items-center" onSubmit={onSearch}>
-            <input
-              className="h-11 w-full rounded-l-xl border border-r-0 border-brand-100 bg-white px-4 text-sm outline-none focus:border-brand-700"
-              placeholder="Я шукаю..."
-              aria-label="Пошук товарів"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <button type="submit" className="h-11 shrink-0 rounded-r-xl bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-800">
-              Знайти
-            </button>
+            <div className="flex h-11 w-full items-center rounded-xl border border-[#E8C4B4] bg-white pl-4 focus-within:border-brand-700">
+              <input
+                className="h-full w-full bg-transparent text-sm outline-none"
+                placeholder="Я шукаю..."
+                aria-label="Пошук товарів"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              <button type="submit" className="mr-1 h-9 shrink-0 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-800">
+                Знайти
+              </button>
+            </div>
           </form>
           <nav className="ml-auto flex items-center gap-3 sm:gap-4">
-            <IconLabel to="/?sort=price_asc" label="Знижки">
+            <IconLabel to="/catalog?sort=price_asc" label="Знижки">
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                 <path d="M4 14l8-8h6v6l-8 8a2 2 0 0 1-2.8 0L4 16.8A2 2 0 0 1 4 14z" strokeLinejoin="round" />
                 <circle cx="15.5" cy="8.5" r="1" fill="currentColor" stroke="none" />
@@ -180,7 +182,7 @@ export function Layout() {
           <div>
             <p className="font-semibold text-white">Покупцям</p>
             <ul className="mt-3 space-y-2">
-              <li><Link className="hover:text-white" to="/">Каталог</Link></li>
+              <li><Link className="hover:text-white" to="/catalog">Каталог</Link></li>
               <li><Link className="hover:text-white" to="/compare">Порівняння</Link></li>
               <li><Link className="hover:text-white" to="/recent">Переглянуті</Link></li>
               <li><Link className="hover:text-white" to={user ? '/orders' : '/login'}>Замовлення</Link></li>

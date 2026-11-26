@@ -4,11 +4,12 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import { AuthPanel } from '../components/AuthPanel'
+import { HomePage } from './HomePage'
 import { Button, ErrorText, Field } from '../components/Field'
-import { GoogleSignIn } from '../components/GoogleSignIn'
+import { SocialSignIn } from '../components/SocialSignIn'
 
 export function LoginPage() {
-  const { user, login, loginWithGoogle } = useAuth()
+  const { user, login, loginWithGoogle, loginWithApple } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from ?? '/'
@@ -47,8 +48,29 @@ export function LoginPage() {
     }
   }
 
+  async function onApple(idToken: string, firstName?: string, lastName?: string) {
+    setBusy(true)
+    setError('')
+    try {
+      await loginWithApple(idToken, firstName, lastName)
+      navigate(from, { replace: true })
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : 'Не вдалося увійти через Apple.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
-    <AuthPanel title="Вхід" alternateTo="/register" alternateLabel="Зареєструватися">
+    <>
+    <div className="pointer-events-none" aria-hidden><HomePage /></div>
+    <AuthPanel title="Вхід" alternateTo="/register" alternateLabel="Зареєструватися" closeTo={from} overlay>
+      <SocialSignIn busy={busy} onGoogle={(idToken) => void onGoogle(idToken)} onApple={(idToken, firstName, lastName) => void onApple(idToken, firstName, lastName)} onError={setError} />
+      <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-wide text-stone-400">
+        <span className="h-px flex-1 bg-stone-200" />
+        або електронною поштою
+        <span className="h-px flex-1 bg-stone-200" />
+      </div>
       <form className="space-y-3" onSubmit={(event) => void onSubmit(event)}>
         <Field label="Електронна пошта" name="email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
         <Field label="Пароль" name="password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
@@ -56,12 +78,10 @@ export function LoginPage() {
         <ErrorText>{error}</ErrorText>
         <Button type="submit" className="w-full" disabled={busy}>Увійти</Button>
       </form>
-      <div className="mt-4">
-        <GoogleSignIn onToken={(idToken) => void onGoogle(idToken)} onError={setError} />
-      </div>
       <p className="mt-4 rounded-xl bg-brand-50 p-3 text-sm text-stone-600">
         Демо-покупець: buyer@rozetka.test, пароль Buyer12345. Адмін: admin@rozetka.test, пароль Admin12345.
       </p>
     </AuthPanel>
+    </>
   )
 }

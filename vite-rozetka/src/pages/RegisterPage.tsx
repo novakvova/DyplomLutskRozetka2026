@@ -5,9 +5,11 @@ import { ApiError } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import { AuthPanel } from '../components/AuthPanel'
 import { Button, ErrorText, Field } from '../components/Field'
+import { SocialSignIn } from '../components/SocialSignIn'
+import { HomePage } from './HomePage'
 
 export function RegisterPage() {
-  const { register } = useAuth()
+  const { register, loginWithGoogle, loginWithApple } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', password: '', confirm: '', firstName: '', lastName: '', phone: '' })
   const [consent, setConsent] = useState(false)
@@ -47,7 +49,20 @@ export function RegisterPage() {
   }
 
   return (
-    <AuthPanel title="Реєстрація" alternateTo="/login" alternateLabel="Увійти">
+    <>
+    <div className="pointer-events-none" aria-hidden><HomePage /></div>
+    <AuthPanel title="Реєстрація" alternateTo="/login" alternateLabel="Увійти" overlay>
+      <SocialSignIn
+        busy={busy}
+        onError={setError}
+        onGoogle={(idToken) => void loginWithGoogle(idToken).then(() => navigate('/')).catch((reason: unknown) => setError(reason instanceof ApiError ? reason.message : 'Не вдалося увійти через Google.'))}
+        onApple={(idToken, firstName, lastName) => void loginWithApple(idToken, firstName, lastName).then(() => navigate('/')).catch((reason: unknown) => setError(reason instanceof ApiError ? reason.message : 'Не вдалося увійти через Apple.'))}
+      />
+      <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-wide text-stone-400">
+        <span className="h-px flex-1 bg-stone-200" />
+        або електронною поштою
+        <span className="h-px flex-1 bg-stone-200" />
+      </div>
       <form className="space-y-3" onSubmit={(event) => void onSubmit(event)}>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Ім’я" name="firstName" required value={form.firstName} onChange={(event) => update('firstName', event.target.value)} />
@@ -65,5 +80,6 @@ export function RegisterPage() {
         <Button type="submit" className="w-full" disabled={busy}>Зареєструватись</Button>
       </form>
     </AuthPanel>
+    </>
   )
 }

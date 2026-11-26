@@ -12,10 +12,8 @@ export function CartGlyph({ className = 'h-5 w-5' }: { className?: string }) {
 
 export function Logo({ light = false, to = '/' }: { light?: boolean, to?: string }) {
   return (
-    <Link to={to} className={`inline-flex items-center gap-2 text-xl font-bold tracking-tight ${light ? 'text-white' : 'text-ink'}`}>
-      <span className={`grid h-9 w-9 place-items-center rounded-xl ${light ? 'bg-white/15' : 'bg-brand-700 text-white'}`}>
-        <CartGlyph className="h-5 w-5" />
-      </span>
+    <Link to={to} className={`inline-flex items-center gap-1.5 text-[22px] font-bold tracking-tight ${light ? 'text-white' : 'text-ink'}`}>
+      <CartGlyph className={`h-6 w-6 ${light ? 'text-white' : 'text-brand-700'}`} />
       Hopely
     </Link>
   )

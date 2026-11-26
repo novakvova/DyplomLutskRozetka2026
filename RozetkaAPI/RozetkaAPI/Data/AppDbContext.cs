@@ -27,8 +27,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(user => user.LastName).HasMaxLength(40);
             entity.Property(user => user.Phone).HasMaxLength(20);
             entity.Property(user => user.GoogleSubject).HasMaxLength(128);
+            entity.Property(user => user.AppleSubject).HasMaxLength(128);
             entity.HasIndex(user => user.Email).IsUnique();
             entity.HasIndex(user => user.GoogleSubject).IsUnique();
+            entity.HasIndex(user => user.AppleSubject).IsUnique();
         });
 
         modelBuilder.Entity<PasswordResetToken>(entity =>

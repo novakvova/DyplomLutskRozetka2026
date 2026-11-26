@@ -47,6 +47,8 @@ builder.Services.AddSingleton<ResetMailer>();
 builder.Services.AddSingleton<PaymentService>();
 builder.Services.AddScoped<OrderNotifier>();
 builder.Services.AddHttpClient("novaposhta", client => client.BaseAddress = new Uri("https://api.novaposhta.ua/v2.0/json/"));
+builder.Services.AddHttpClient("apple");
+builder.Services.AddScoped<AppleSignIn>();
 builder.Services.AddScoped<DeliveryService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<CatalogService>();

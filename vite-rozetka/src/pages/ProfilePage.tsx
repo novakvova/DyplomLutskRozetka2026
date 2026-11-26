@@ -88,7 +88,7 @@ export function ProfilePage() {
         {user?.hasPassword ? (
           <Field label="Поточний пароль" name="currentPassword" type="password" autoComplete="current-password" required value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
         ) : (
-          <p className="text-sm text-stone-600">Цей акаунт створено через Google. Можна задати пароль і входити також поштою.</p>
+          <p className="text-sm text-stone-600">Цей акаунт створено через Google або Apple. Можна задати пароль і входити також поштою.</p>
         )}
         <Field label="Новий пароль" name="newPassword" type="password" autoComplete="new-password" required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
         <Button type="submit" disabled={busy}>Оновити пароль</Button>

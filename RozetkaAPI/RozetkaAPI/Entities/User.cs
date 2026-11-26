@@ -9,6 +9,7 @@ public class User
     public string LastName { get; set; } = "";
     public string? Phone { get; set; }
     public string? GoogleSubject { get; set; }
+    public string? AppleSubject { get; set; }
     public UserRole Role { get; set; } = UserRole.Buyer;
     public bool IsBlocked { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

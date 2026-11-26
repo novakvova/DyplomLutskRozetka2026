@@ -16,7 +16,8 @@ public class AuthService(
     TokenService tokens,
     IConfiguration configuration,
     ResetMailer mailer,
-    ILogger<AuthService> logger)
+    ILogger<AuthService> logger,
+    AppleSignIn apple)
 {
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken)
     {
@@ -106,6 +107,46 @@ public class AuthService(
             else if (user.GoogleSubject != payload.Subject)
             {
                 throw new AppException(StatusCodes.Status409Conflict, "Ця пошта вже прив’язана до іншого входу Google.");
+            }
+        }
+
+        EnsureActive(user);
+        await db.SaveChangesAsync(cancellationToken);
+        return Issue(user);
+    }
+
+    public AuthProvidersResponse Providers() => new(
+        configuration["Google:ClientId"] ?? "",
+        configuration["Apple:ClientId"] ?? "");
+
+    public async Task<AuthResponse> LoginWithAppleAsync(AppleLoginRequest request, CancellationToken cancellationToken)
+    {
+        var (subject, emailAddress) = await apple.ValidateAsync(request.IdToken, cancellationToken);
+        var email = InputRules.Email(emailAddress);
+        var user = await db.Users.SingleOrDefaultAsync(item => item.AppleSubject == subject, cancellationToken);
+        if (user is null)
+        {
+            user = await db.Users.SingleOrDefaultAsync(item => item.Email == email, cancellationToken);
+            if (user is null)
+            {
+                user = new User
+                {
+                    Email = email,
+                    AppleSubject = subject,
+                    FirstName = GoogleName(request.FirstName, "Покупець"),
+                    LastName = GoogleName(request.LastName, "Apple"),
+                    Role = UserRole.Buyer,
+                    CreatedAt = DateTime.UtcNow
+                };
+                db.Users.Add(user);
+            }
+            else if (user.AppleSubject is null)
+            {
+                user.AppleSubject = subject;
+            }
+            else if (user.AppleSubject != subject)
+            {
+                throw new AppException(StatusCodes.Status409Conflict, "Ця пошта вже прив’язана до іншого входу Apple.");
             }
         }
 

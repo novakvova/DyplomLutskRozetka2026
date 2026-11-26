@@ -86,7 +86,6 @@ export function CatalogPage() {
     [products, inStock],
   )
   const page = shown.slice(0, visible)
-  const browsing = !query && !categoryId && !minPrice && !maxPrice && !inStock
   const activeCategory = categories.find((category) => String(category.id) === categoryId)
 
   function writeParams(next: { category?: string, min?: string, max?: string, stock?: boolean, sort?: string }) {
@@ -121,7 +120,7 @@ export function CatalogPage() {
 
   async function addToCart(product: Product) {
     if (!user) {
-      navigate('/login', { state: { from: `/${locationSearch()}` } })
+      navigate('/login', { state: { from: `/catalog${locationSearch()}` } })
       return
     }
     setPendingId(product.id)
@@ -146,7 +145,7 @@ export function CatalogPage() {
 
   async function toggleFavorite(product: Product) {
     if (!user) {
-      navigate('/login', { state: { from: `/${locationSearch()}` } })
+      navigate('/login', { state: { from: `/catalog${locationSearch()}` } })
       return
     }
     setError('')
@@ -165,39 +164,10 @@ export function CatalogPage() {
 
   return (
     <section>
-      {browsing ? (
-        <div className="mb-6 overflow-hidden rounded-3xl bg-brand-700 text-white">
-          <div className="grid items-center gap-6 px-6 py-8 sm:px-10 lg:grid-cols-[1.2fr_0.8fr]">
-            <div>
-              <p className="text-sm font-medium text-white/80">Сезонна добірка</p>
-              <h1 className="mt-2 text-3xl font-semibold leading-tight sm:text-4xl">Чорна п’ятниця в Hopely</h1>
-              <p className="mt-3 max-w-md text-sm leading-6 text-white/90">
-                Смартфони, ноутбуки, аудіо і техніка для дому. Доставка Новою поштою, оплата карткою або під час отримання.
-              </p>
-              <a href="#catalog" className="mt-6 inline-flex rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-brand-800 hover:bg-brand-50">
-                Переглянути пропозиції
-              </a>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {categories.slice(0, 4).map((category) => (
-                <button
-                  key={category.id}
-                  type="button"
-                  className="rounded-2xl bg-white/15 px-4 py-5 text-left text-sm font-medium hover:bg-white/25"
-                  onClick={() => writeParams({ category: String(category.id), min: '', max: '', stock: false })}
-                >
-                  {category.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="mb-4">
-          <h1 className="text-2xl font-semibold">{query ? `Пошук: ${query}` : activeCategory?.name ?? 'Каталог'}</h1>
-          <p className="mt-1 text-sm text-stone-500">{loading ? 'Шукаємо товари' : `${shown.length} товарів`}</p>
-        </div>
-      )}
+      <div className="mb-4">
+        <h1 className="text-2xl font-semibold">{query ? `Пошук: ${query}` : activeCategory?.name ?? 'Каталог'}</h1>
+        <p className="mt-1 text-sm text-stone-500">{loading ? 'Шукаємо товари' : `${shown.length} товарів`}</p>
+      </div>
 
       <div id="catalog" className="grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
         <aside className="rounded-2xl bg-white p-4 shadow-sm">
