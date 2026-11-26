@@ -114,19 +114,26 @@ export function ProductPage() {
   if (!product)
     return <ErrorText>{error || 'Товар не знайдено.'}</ErrorText>
 
+  const monthly = Math.ceil(product.price / 24)
   return (
-    <article className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <article>
+      <p className="text-sm text-muted">
+        <Link to="/" className="hover:text-brand-700">Головна</Link>
+        <span> · </span>
+        <Link to={`/catalog?category=${product.categoryId}`} className="hover:text-brand-700">{product.categoryName}</Link>
+      </p>
+      <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
       <div>
-        <Link to="/" className="text-sm text-brand-700">До каталогу</Link>
-        <p className="mt-2 text-sm text-stone-500">{product.categoryName}</p>
-        <h1 className="mt-1 text-2xl font-semibold">{product.name}</h1>
         {product.images.length > 0 ? (
-          <div className="mt-4">
-            <img src={product.images[photo] ?? product.images[0]} alt={product.name} className="h-72 w-full rounded-2xl bg-cream object-contain p-4" />
+          <div className="relative">
+            {product.oldPrice && product.oldPrice > product.price ? (
+              <span className="absolute left-3 top-3 z-10 rounded bg-brand-700 px-2 py-0.5 text-xs font-semibold text-white">−{Math.round((1 - product.price / product.oldPrice) * 100)}%</span>
+            ) : null}
+            <img src={product.images[photo] ?? product.images[0]} alt={product.name} className="h-80 w-full rounded-2xl bg-cream object-contain p-6" />
             {product.images.length > 1 ? (
               <div className="mt-2 flex gap-2">
                 {product.images.map((image, index) => (
-                  <button key={image} type="button" className={`h-14 w-14 overflow-hidden rounded-lg border bg-cream ${index === photo ? 'border-brand-700' : 'border-stone-200'}`} onClick={() => setPhoto(index)}>
+                  <button key={image} type="button" className={`h-16 w-16 overflow-hidden rounded-lg border bg-cream ${index === photo ? 'border-brand-700' : 'border-line'}`} onClick={() => setPhoto(index)}>
                     <img src={image} alt="" className="h-full w-full object-contain" />
                   </button>
                 ))}
@@ -134,6 +141,44 @@ export function ProductPage() {
             ) : null}
           </div>
         ) : null}
+      </div>
+      <div>
+        <h1 className="text-2xl font-bold leading-8">{product.name}</h1>
+        <p className="mt-2 text-sm text-muted">
+          {product.averageRating !== null ? `${product.averageRating.toFixed(1)} · ` : ''}
+          {product.reviewCount} відгуків
+        </p>
+        <div className="mt-4">
+          {product.oldPrice ? <p className="text-sm text-muted line-through">{formatMoney(product.oldPrice)}</p> : null}
+          <p className="text-3xl font-bold text-brand-700">{formatMoney(product.price)}</p>
+          <p className="text-sm text-muted">або від {formatMoney(monthly)}/міс.</p>
+        </div>
+        <p className={`mt-2 text-sm font-medium ${product.stock > 0 ? 'text-ok' : 'text-muted'}`}>{product.stock > 0 ? 'Є в наявності' : 'Немає в наявності'}</p>
+        <label className="mt-3 block text-sm">
+          Кількість
+          <input className="mt-1 w-24 rounded-lg border border-line px-3 py-2" type="number" min={1} max={Math.min(20, product.stock || 1)} value={quantity} disabled={product.stock === 0} onChange={(event) => setQuantity(Number(event.target.value))} />
+        </label>
+        <div className="mt-4 flex flex-col gap-2">
+          <Button type="button" disabled={busy || product.stock === 0} onClick={() => void saveCart()}>
+            {product.cartQuantity > 0 ? 'Оновити кошик' : 'Купити'}
+          </Button>
+          <button type="button" className="rounded-lg border border-line px-4 py-2 hover:bg-cream disabled:opacity-50" disabled={busy} onClick={() => void toggleFavorite()}>
+            {product.isFavorite ? 'У обраному' : 'В обране'}
+          </button>
+          <button type="button" className="rounded-lg border border-line px-4 py-2 hover:bg-cream" onClick={() => setCompared(toggleCompare(product.id))}>
+            {compared.includes(product.id) ? 'У порівнянні' : 'Порівняти'}
+          </button>
+        </div>
+        <ul className="mt-4 space-y-1 text-sm text-muted">
+          <li>Нова пошта — відділення</li>
+          <li>Офіційна гарантія</li>
+          <li>14 днів на повернення</li>
+        </ul>
+        <div className="mt-3"><ErrorText>{error}</ErrorText></div>
+      </div>
+      </div>
+      <div className="mt-8 max-w-3xl">
+        <h2 className="text-lg font-semibold">Усе про товар</h2>
         <p className="mt-3 max-w-2xl text-stone-700">{product.shortDescription}</p>
         {product.fullDescription ? <p className="mt-3 max-w-2xl whitespace-pre-wrap text-stone-700">{product.fullDescription}</p> : null}
         {product.characteristics.length > 0 ? (
@@ -153,11 +198,6 @@ export function ProductPage() {
             Сайт виробника
           </a>
         ) : null}
-        <p className="mt-4 text-sm text-stone-500">
-          {product.reviewCount > 0 && product.averageRating !== null
-            ? `${product.averageRating.toFixed(1)} з 5 · ${product.reviewCount} відгуків`
-            : 'Відгуків ще немає'}
-        </p>
         <section className="mt-8">
           <h2 className="text-lg font-semibold">Відгуки</h2>
           <ul className="mt-3 space-y-3">
@@ -184,37 +224,6 @@ export function ProductPage() {
           )}
         </section>
       </div>
-      <aside className="h-fit rounded-2xl bg-white p-5 shadow-sm">
-        {product.oldPrice ? <p className="text-sm text-muted line-through">{formatMoney(product.oldPrice)}</p> : null}
-        <p className="text-3xl font-bold text-brand-700">{formatMoney(product.price)}</p>
-        <p className={`mt-1 text-sm font-medium ${product.stock > 0 ? 'text-emerald-600' : 'text-stone-400'}`}>{product.stock > 0 ? `Є в наявності · ${product.stock} шт.` : 'Немає в наявності'}</p>
-        <label className="mt-4 block text-sm font-medium text-stone-700">
-          Кількість
-          <input
-            className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2"
-            type="number"
-            min={1}
-            max={Math.min(20, product.stock || 1)}
-            value={quantity}
-            disabled={product.stock === 0}
-            onChange={(event) => setQuantity(Number(event.target.value))}
-          />
-        </label>
-        <div className="mt-4 flex flex-col gap-2">
-          <Button type="button" disabled={busy || product.stock === 0} onClick={() => void saveCart()}>
-            {product.cartQuantity > 0 ? 'Оновити кошик' : 'Додати в кошик'}
-          </Button>
-          <button type="button" className="rounded-lg border border-stone-300 px-4 py-2 text-stone-800 hover:bg-stone-50 disabled:opacity-50" disabled={busy} onClick={() => void toggleFavorite()}>
-            {product.isFavorite ? 'Прибрати з обраного' : 'В обране'}
-          </button>
-          <button type="button" className="rounded-lg border border-stone-300 px-4 py-2 text-stone-800 hover:bg-stone-50" onClick={() => setCompared(toggleCompare(product.id))}>
-            {compared.includes(product.id) ? 'У порівнянні' : 'Порівняти'}
-          </button>
-        </div>
-        <div className="mt-3">
-          <ErrorText>{error}</ErrorText>
-        </div>
-      </aside>
     </article>
   )
 }

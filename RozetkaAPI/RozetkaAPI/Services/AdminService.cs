@@ -308,7 +308,11 @@ public class AdminService(AppDbContext db, OrderNotifier notifier)
                 0,
                 product.CategoryId,
                 product.Category.Name,
-                product.ImageUrl))
+                product.ImageUrl,
+                product.Characteristics
+                    .OrderBy(item => item.SortOrder)
+                    .Select(item => new CharacteristicResponse(item.Name, item.Value))
+                    .ToList()))
             .SingleAsync(cancellationToken);
     }
 

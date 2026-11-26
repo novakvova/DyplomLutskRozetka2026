@@ -11,10 +11,11 @@ export function CartGlyph({ className = 'h-5 w-5' }: { className?: string }) {
 }
 
 export function Logo({ light = false, to = '/' }: { light?: boolean, to?: string }) {
+  const tone = light ? 'brightness-0 invert' : ''
   return (
-    <Link to={to} className={`inline-flex items-center gap-1.5 text-[22px] font-bold tracking-tight ${light ? 'text-white' : 'text-ink'}`}>
-      <CartGlyph className={`h-6 w-6 ${light ? 'text-white' : 'text-brand-700'}`} />
-      Hopely
+    <Link to={to} className="inline-flex items-center gap-2" aria-label="Hopely">
+      <img src="/hopely/logo-mark.svg" alt="" className={`h-8 w-auto ${tone}`} />
+      <img src="/hopely/logo-word.svg" alt="" className={`h-6 w-auto ${tone}`} />
     </Link>
   )
 }

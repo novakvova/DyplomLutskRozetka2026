@@ -64,7 +64,11 @@ public class CatalogService(AppDbContext db)
                 db.Reviews.Count(review => review.ProductId == product.Id),
                 product.CategoryId,
                 product.Category.Name,
-                product.ImageUrl))
+                product.ImageUrl,
+                product.Characteristics
+                    .OrderBy(item => item.SortOrder)
+                    .Select(item => new CharacteristicResponse(item.Name, item.Value))
+                    .ToList()))
             .ToListAsync(cancellationToken);
     }
 

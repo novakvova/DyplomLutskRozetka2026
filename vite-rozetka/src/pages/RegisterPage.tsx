@@ -26,10 +26,6 @@ export function RegisterPage() {
       setError('Паролі не збігаються.')
       return
     }
-    if (!consent) {
-      setError('Потрібна згода на обробку персональних даних.')
-      return
-    }
     setBusy(true)
     setError('')
     try {
@@ -60,6 +56,7 @@ export function RegisterPage() {
         або електронною поштою
         <span className="h-px flex-1 bg-stone-200" />
       </div>
+      <p className="mb-3 text-sm text-muted">Ви вперше в Hopely — заповніть кілька полів, щоб завершити реєстрацію.</p>
       <form className="space-y-3" onSubmit={(event) => void onSubmit(event)}>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Ім’я" name="firstName" required value={form.firstName} onChange={(event) => update('firstName', event.target.value)} />
@@ -71,7 +68,7 @@ export function RegisterPage() {
         <Field label="Повторіть пароль" name="confirm" type="password" autoComplete="new-password" required value={form.confirm} onChange={(event) => update('confirm', event.target.value)} />
         <label className="flex items-start gap-2 text-sm text-stone-700">
           <input type="checkbox" className="mt-1 accent-brand-700" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-          Даю згоду на обробку персональних даних
+          Хочу отримувати персональні знижки та новини
         </label>
         <ErrorText>{error}</ErrorText>
         <Button type="submit" className="w-full" disabled={busy}>Зареєструватись</Button>

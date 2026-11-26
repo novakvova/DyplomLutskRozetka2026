@@ -33,7 +33,7 @@ function IconLabel({
 }
 
 export function Layout() {
-  const { user, loading, logout } = useAuth()
+  const { user, loading } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [params] = useSearchParams()
@@ -79,11 +79,6 @@ export function Layout() {
     navigate(`/catalog?${next.toString()}`)
   }
 
-  async function onLogout() {
-    await logout()
-    navigate('/')
-  }
-
   const accountTo = user ? '/profile' : '/login'
 
   return (
@@ -120,7 +115,7 @@ export function Layout() {
             ) : null}
           </div>
           <form className="flex min-w-[220px] flex-1 items-center gap-2" onSubmit={onSearch}>
-            <div className="flex h-11 w-full items-center gap-2 rounded-lg bg-cream px-3">
+            <div className="flex h-11 w-full items-center gap-2 rounded-lg border border-brand-700 bg-white px-3">
               <img src="/hopely/icon-search.svg" alt="" className="h-4 w-4" />
               <input
                 className="h-full w-full bg-transparent text-sm outline-none"
@@ -146,14 +141,10 @@ export function Layout() {
             </IconLabel>
           </nav>
         </div>
-        {!loading && user ? (
-          <div className="border-t border-stone-100">
-            <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-2 text-sm text-stone-600">
-              <Link to="/orders" className="hover:text-brand-700">Замовлення</Link>
-              <Link to="/compare" className="hover:text-brand-700">Порівняння</Link>
-              <Link to="/recent" className="hover:text-brand-700">Переглянуті</Link>
-              {user.role === 'Admin' ? <Link to="/admin" className="hover:text-brand-700">Адмінка</Link> : null}
-              <button type="button" className="ml-auto hover:text-brand-700" onClick={() => void onLogout()}>Вийти</button>
+        {!loading && user?.role === 'Admin' ? (
+          <div className="border-t border-line">
+            <div className="mx-auto flex max-w-[1440px] px-4 py-2 text-sm lg:px-10">
+              <Link to="/admin" className="hover:text-brand-700">Адмінка</Link>
             </div>
           </div>
         ) : null}

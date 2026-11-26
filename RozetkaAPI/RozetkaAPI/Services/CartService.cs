@@ -95,5 +95,7 @@ public class CartService(AppDbContext db)
                 item.Product.Price,
                 item.Quantity,
                 item.Product.Stock,
-                item.Product.Price * item.Quantity));
+                item.Product.Price * item.Quantity,
+                item.Product.ImageUrl,
+                item.Product.OldPrice));
 }

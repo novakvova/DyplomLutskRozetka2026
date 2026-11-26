@@ -26,6 +26,7 @@ export function AuthPanel({
           <p className="mt-4 max-w-xs text-sm leading-6 text-white/90">
             Зберігайте улюблені товари та відстежуйте свої замовлення.
           </p>
+          <img src="/hopely/ornament.svg" alt="" className="mt-6 h-14 w-full object-cover object-left brightness-0 invert" />
         </div>
         <Link
           to={alternateTo}

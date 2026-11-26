@@ -58,9 +58,18 @@ export function OrderPage() {
   }
 
   return (
-    <section className="max-w-2xl space-y-4">
-      <Link to="/orders" className="text-sm text-brand-800">До списку замовлень</Link>
-      <h1 className="text-2xl font-semibold">Замовлення №{order.id}</h1>
+    <section className="mx-auto max-w-3xl space-y-4">
+      <div className="rounded-2xl bg-white px-6 py-8 text-center shadow-[0_4px_16px_rgba(36,37,31,0.06)]">
+        <img src="/hopely/ornament.svg" alt="" className="mx-auto h-14 w-full max-w-md object-cover" />
+        <h1 className="mt-4 text-3xl font-bold">Дякуємо! Замовлення оформлено</h1>
+        <p className="mt-2 text-sm text-brand-700">Замовлення № {order.id}</p>
+        <p className="mt-2 text-sm text-muted">Деталі надіслані на пошту. Статус: {orderStatusLabel[order.status] ?? order.status}.</p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Link to="/catalog" className="rounded-lg border border-brand-700 px-5 py-2.5 text-sm font-semibold text-brand-700">Продовжити покупки</Link>
+          <Link to="/orders" className="rounded-lg bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white">Відстежити замовлення</Link>
+        </div>
+      </div>
+      <h2 className="text-xl font-semibold">Замовлення №{order.id}</h2>
       <p className="text-stone-600">{formatDate(order.createdAt)} · {orderStatusLabel[order.status] ?? order.status}</p>
       <div className="rounded-xl border border-stone-200 bg-white p-4 text-sm">
         <p>{order.recipientName}, {order.phone}</p>

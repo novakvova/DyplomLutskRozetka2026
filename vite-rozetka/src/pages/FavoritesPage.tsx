@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../api'
+import { AccountMenu } from '../components/AccountMenu'
 import { ErrorText } from '../components/Field'
 import { formatMoney } from '../lib/format'
 import type { Favorite } from '../types'
@@ -35,8 +36,10 @@ export function FavoritesPage() {
     return <p className="text-stone-600">Завантаження…</p>
 
   return (
-    <section className="space-y-4">
-      <h1 className="text-2xl font-semibold">Обране</h1>
+    <section className="grid items-start gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <AccountMenu active="favorites" />
+      <div className="space-y-4">
+      <h1 className="text-3xl font-bold">Обране</h1>
       <ErrorText>{error}</ErrorText>
       {items.length === 0 ? <p className="text-stone-600">В обраному ще нічого немає.</p> : null}
       <ul className="space-y-3">
@@ -54,6 +57,7 @@ export function FavoritesPage() {
           </li>
         ))}
       </ul>
+      </div>
     </section>
   )
 }

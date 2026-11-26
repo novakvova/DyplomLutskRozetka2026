@@ -1,11 +1,10 @@
 export function formatMoney(value: number) {
   const hasCents = Math.round(value * 100) % 100 !== 0
-  return new Intl.NumberFormat('uk-UA', {
-    style: 'currency',
-    currency: 'UAH',
+  const formatted = new Intl.NumberFormat('uk-UA', {
     minimumFractionDigits: hasCents ? 2 : 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: hasCents ? 2 : 0,
   }).format(value)
+  return `${formatted} ₴`
 }
 
 export function formatDate(value: string) {

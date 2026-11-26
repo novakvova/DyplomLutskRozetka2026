@@ -1,228 +1,296 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api'
 import { ProductCard } from '../components/ProductCard'
 import { ErrorText } from '../components/Field'
-import { compareIds, toggleCompare } from '../lib/browse'
-import type { Category, Product } from '../types'
+import type { Category, Favorite, Product } from '../types'
 
 const pageSize = 8
+
+type Filters = {
+  brands: string[]
+  cpus: string[]
+  rams: string[]
+  screens: string[]
+  inStock: boolean
+  min: number | null
+  max: number | null
+  oled: boolean
+}
+
+const emptyFilters: Filters = { brands: [], cpus: [], rams: [], screens: [], inStock: false, min: null, max: null, oled: false }
+
+function spec(product: Product, includes: string) {
+  return product.characteristics?.find((item) => item.name.toLowerCase().includes(includes))?.value ?? ''
+}
+
+function brandOf(product: Product) {
+  const named = spec(product, 'бренд')
+  if (named)
+    return named
+  return ['ASUS', 'Lenovo', 'Acer', 'HP', 'Dell', 'Apple', 'Samsung'].find((brand) => product.name.includes(brand)) ?? ''
+}
+
+function screenOf(value: string) {
+  const size = Number.parseFloat(value.replace(',', '.'))
+  if (!Number.isFinite(size))
+    return ''
+  if (size < 15)
+    return '13–14"'
+  if (size < 16)
+    return '15–15,6"'
+  if (size < 17)
+    return '16"'
+  return '17" і більше'
+}
+
+function counts(values: string[]) {
+  const map = new Map<string, number>()
+  for (const value of values) {
+    if (value)
+      map.set(value, (map.get(value) ?? 0) + 1)
+  }
+  return [...map.entries()]
+}
 
 export function CatalogPage() {
   const [params, setParams] = useSearchParams()
   const query = params.get('q') ?? ''
   const categoryId = params.get('category') ?? ''
   const sort = params.get('sort') ?? 'new'
-  const minPrice = params.get('min') ?? ''
-  const maxPrice = params.get('max') ?? ''
-  const inStock = params.get('stock') === '1'
-
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [loved, setLoved] = useState<number[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [compared, setCompared] = useState<number[]>(() => compareIds())
+  const [applied, setApplied] = useState<Filters>(emptyFilters)
+  const [draft, setDraft] = useState<Filters>(emptyFilters)
   const [visible, setVisible] = useState(pageSize)
-  const [draft, setDraft] = useState({ category: categoryId, min: minPrice, max: maxPrice, stock: inStock })
-
-  useEffect(() => {
-    setDraft({ category: categoryId, min: minPrice, max: maxPrice, stock: inStock })
-    setVisible(pageSize)
-  }, [categoryId, minPrice, maxPrice, inStock, query, sort])
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     api<Category[]>('/api/categories').then(setCategories).catch(() => setCategories([]))
+    api<Favorite[]>('/api/favorites').then((items) => setLoved(items.map((item) => item.productId))).catch(() => setLoved([]))
   }, [])
 
   useEffect(() => {
     const search = new URLSearchParams()
     if (query.trim())
       search.set('query', query.trim())
-    if (sort !== 'new')
-      search.set('sort', sort)
     if (categoryId)
       search.set('categoryId', categoryId)
-    if (minPrice.trim())
-      search.set('minPrice', minPrice.trim())
-    if (maxPrice.trim())
-      search.set('maxPrice', maxPrice.trim())
-    const suffix = search.toString()
     setLoading(true)
     setError('')
-    api<Product[]>(`/api/products${suffix ? `?${suffix}` : ''}`)
+    setVisible(pageSize)
+    setPage(1)
+    api<Product[]>(`/api/products${search.size ? `?${search}` : ''}`)
       .then(setProducts)
       .catch((reason: unknown) => setError(reason instanceof ApiError ? reason.message : 'Не вдалося завантажити товари.'))
       .finally(() => setLoading(false))
-  }, [query, sort, categoryId, minPrice, maxPrice])
+  }, [query, categoryId])
 
-  const shown = useMemo(
-    () => products.filter((product) => !inStock || product.stock > 0),
-    [products, inStock],
-  )
-  const page = shown.slice(0, visible)
-  const activeCategory = categories.find((category) => String(category.id) === categoryId)
+  const pool = products
+  const brands = counts(pool.map(brandOf))
+  const cpus = counts(pool.map((product) => spec(product, 'процесор')))
+  const rams = counts(pool.map((product) => spec(product, 'пам')))
+  const screens = counts(pool.map((product) => screenOf(spec(product, 'екран'))))
+  const prices = pool.map((product) => product.price)
+  const floor = prices.length ? Math.floor(Math.min(...prices)) : 0
+  const ceil = prices.length ? Math.ceil(Math.max(...prices)) : 0
 
-  function writeParams(next: { category?: string, min?: string, max?: string, stock?: boolean, sort?: string }) {
+  const shown = useMemo(() => {
+    const next = pool.filter((product) => {
+      const brand = brandOf(product)
+      const cpu = spec(product, 'процесор')
+      const ram = spec(product, 'пам')
+      const screen = screenOf(spec(product, 'екран'))
+      if (applied.brands.length && !applied.brands.includes(brand))
+        return false
+      if (applied.cpus.length && !applied.cpus.includes(cpu))
+        return false
+      if (applied.rams.length && !applied.rams.includes(ram))
+        return false
+      if (applied.screens.length && !applied.screens.includes(screen))
+        return false
+      if (applied.inStock && product.stock <= 0)
+        return false
+      if (applied.min !== null && product.price < applied.min)
+        return false
+      if (applied.max !== null && product.price > applied.max)
+        return false
+      if (applied.oled && !`${product.name} ${spec(product, 'екран')}`.toLowerCase().includes('oled'))
+        return false
+      return true
+    })
+    const sorted = [...next]
+    if (sort === 'price_asc')
+      sorted.sort((a, b) => a.price - b.price)
+    else if (sort === 'price_desc')
+      sorted.sort((a, b) => b.price - a.price)
+    else if (sort === 'name')
+      sorted.sort((a, b) => a.name.localeCompare(b.name, 'uk'))
+    return sorted
+  }, [pool, applied, sort])
+
+  const pages = Math.max(1, Math.ceil(shown.length / pageSize))
+  const slice = shown.slice((page - 1) * pageSize, page * pageSize).slice(0, visible)
+  const category = categories.find((item) => String(item.id) === categoryId)
+  const chips = [
+    ...applied.brands,
+    ...applied.cpus,
+    ...applied.rams,
+    ...applied.screens,
+    applied.oled ? 'З OLED-екраном' : '',
+    applied.max === 25000 ? 'До 25 000 ₴' : '',
+  ].filter(Boolean)
+
+  function toggle(list: string[], value: string) {
+    return list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
+  }
+
+  function setSort(value: string) {
     const search = new URLSearchParams(params)
-    const category = next.category ?? categoryId
-    const min = next.min ?? minPrice
-    const max = next.max ?? maxPrice
-    const stock = next.stock ?? inStock
-    const nextSort = next.sort ?? sort
-    if (category)
-      search.set('category', category)
-    else
-      search.delete('category')
-    if (min.trim())
-      search.set('min', min.trim())
-    else
-      search.delete('min')
-    if (max.trim())
-      search.set('max', max.trim())
-    else
-      search.delete('max')
-    if (stock)
-      search.set('stock', '1')
-    else
-      search.delete('stock')
-    if (nextSort !== 'new')
-      search.set('sort', nextSort)
-    else
+    if (value === 'new')
       search.delete('sort')
+    else
+      search.set('sort', value)
     setParams(search)
   }
 
   return (
     <section>
-      <div className="mb-4">
-        <h1 className="text-2xl font-semibold">{query ? `Пошук: ${query}` : activeCategory?.name ?? 'Каталог'}</h1>
-        <p className="mt-1 text-sm text-stone-500">{loading ? 'Шукаємо товари' : `${shown.length} товарів`}</p>
+      <p className="text-sm text-muted">
+        <Link to="/" className="hover:text-brand-700">Головна</Link>
+        {category ? <span> · {category.name}</span> : null}
+      </p>
+      <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold">{query ? `Пошук: ${query}` : category?.name ?? 'Каталог'}</h1>
+          <p className="text-sm text-muted">{loading ? 'Шукаємо товари' : `${shown.length} товарів`}</p>
+        </div>
       </div>
-
-      <div id="catalog" className="grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="rounded-2xl bg-white p-4 shadow-sm">
-          <p className="text-sm font-semibold">Фільтри</p>
-          <fieldset className="mt-4">
-            <legend className="text-xs font-medium uppercase tracking-wide text-stone-500">Категорія</legend>
-            <label className="mt-2 flex items-center gap-2 text-sm">
-              <input type="radio" name="category" checked={draft.category === ''} onChange={() => setDraft({ ...draft, category: '' })} />
-              Усі категорії
-            </label>
-            {categories.map((category) => (
-              <label key={category.id} className="mt-2 flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="category"
-                  checked={draft.category === String(category.id)}
-                  onChange={() => setDraft({ ...draft, category: String(category.id) })}
-                />
-                {category.name}
-              </label>
-            ))}
-          </fieldset>
-          <div className="mt-5">
-            <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Ціна</p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <input
-                className="rounded-lg border border-stone-200 px-2 py-2 text-sm"
-                inputMode="decimal"
-                placeholder="0 грн"
-                aria-label="Ціна від"
-                value={draft.min}
-                onChange={(event) => setDraft({ ...draft, min: event.target.value })}
-              />
-              <input
-                className="rounded-lg border border-stone-200 px-2 py-2 text-sm"
-                inputMode="decimal"
-                placeholder="140 000"
-                aria-label="Ціна до"
-                value={draft.max}
-                onChange={(event) => setDraft({ ...draft, max: event.target.value })}
-              />
-            </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {brands.map(([name]) => (
+          <button key={name} type="button" className="rounded-full border border-line bg-white px-3 py-1 text-sm" onClick={() => setApplied({ ...applied, brands: toggle(applied.brands, name) })}>{name}</button>
+        ))}
+        <button type="button" className="rounded-full border border-line bg-white px-3 py-1 text-sm" onClick={() => setApplied({ ...applied, oled: !applied.oled })}>З OLED-екраном</button>
+        <button type="button" className="rounded-full border border-line bg-white px-3 py-1 text-sm" onClick={() => setApplied({ ...applied, max: applied.max === 25000 ? null : 25000 })}>До 25 000 ₴</button>
+      </div>
+      <ErrorText>{error}</ErrorText>
+      <div className="mt-4 grid items-start gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <form
+          className="rounded-2xl bg-white p-4 shadow-[0_4px_16px_rgba(36,37,31,0.06)]"
+          onSubmit={(event) => {
+            event.preventDefault()
+            setApplied(draft)
+            setPage(1)
+            setVisible(pageSize)
+          }}
+        >
+          <h2 className="font-semibold">Фільтри</h2>
+          <p className="mt-4 text-sm font-medium">Ціна, ₴</p>
+          <div className="mt-2 flex gap-2">
+            <input className="w-full rounded-lg border border-line px-2 py-1 text-sm" inputMode="numeric" value={draft.min ?? floor} onChange={(event) => setDraft({ ...draft, min: Number(event.target.value) })} />
+            <input className="w-full rounded-lg border border-line px-2 py-1 text-sm" inputMode="numeric" value={draft.max ?? ceil} onChange={(event) => setDraft({ ...draft, max: Number(event.target.value) })} />
           </div>
-          <label className="mt-5 flex items-center justify-between gap-3 text-sm">
+          <input className="mt-3 w-full accent-brand-700" type="range" min={floor} max={ceil || 1} value={draft.max ?? ceil} onChange={(event) => setDraft({ ...draft, max: Number(event.target.value) })} />
+          <FilterGroup title="Бренд" options={brands} selected={draft.brands} onToggle={(value) => setDraft({ ...draft, brands: toggle(draft.brands, value) })} />
+          <FilterGroup title="Діагональ екрана" options={screens} selected={draft.screens} onToggle={(value) => setDraft({ ...draft, screens: toggle(draft.screens, value) })} />
+          <FilterGroup title="Процесор" options={cpus} selected={draft.cpus} onToggle={(value) => setDraft({ ...draft, cpus: toggle(draft.cpus, value) })} />
+          <FilterGroup title="Оперативна пам’ять" options={rams} selected={draft.rams} onToggle={(value) => setDraft({ ...draft, rams: toggle(draft.rams, value) })} />
+          <label className="mt-4 flex items-center justify-between text-sm">
             Тільки в наявності
-            <input
-              type="checkbox"
-              className="h-5 w-5 accent-brand-700"
-              checked={draft.stock}
-              onChange={(event) => setDraft({ ...draft, stock: event.target.checked })}
-            />
+            <input type="checkbox" className="h-5 w-5 accent-brand-700" checked={draft.inStock} onChange={(event) => setDraft({ ...draft, inStock: event.target.checked })} />
           </label>
+          <button type="submit" className="mt-4 w-full rounded-lg bg-brand-700 py-2.5 text-sm font-semibold text-white">Застосувати</button>
           <button
             type="button"
-            className="mt-5 w-full rounded-xl bg-brand-700 py-2.5 text-sm font-semibold text-white hover:bg-brand-800"
-            onClick={() => writeParams({ category: draft.category, min: draft.min, max: draft.max, stock: draft.stock })}
-          >
-            Застосувати
-          </button>
-          <button
-            type="button"
-            className="mt-2 w-full py-2 text-sm text-stone-500 hover:text-brand-700"
+            className="mt-2 w-full rounded-lg bg-brand-50 py-2.5 text-sm font-semibold text-brand-700"
             onClick={() => {
-              setDraft({ category: '', min: '', max: '', stock: false })
-              writeParams({ category: '', min: '', max: '', stock: false, sort: 'new' })
+              setDraft(emptyFilters)
+              setApplied(emptyFilters)
             }}
           >
             Скинути фільтри
           </button>
-        </aside>
-
+        </form>
         <div>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-stone-500">{loading ? 'Завантаження…' : `Показано ${page.length} з ${shown.length}`}</p>
-            <label className="text-sm text-stone-600">
+            <div className="flex flex-wrap gap-2">
+              {chips.map((chip) => (
+                <button key={chip} type="button" className="rounded-full bg-brand-50 px-3 py-1 text-sm text-brand-800" onClick={() => setApplied({
+                  ...applied,
+                  brands: applied.brands.filter((item) => item !== chip),
+                  cpus: applied.cpus.filter((item) => item !== chip),
+                  rams: applied.rams.filter((item) => item !== chip),
+                  screens: applied.screens.filter((item) => item !== chip),
+                  oled: chip === 'З OLED-екраном' ? false : applied.oled,
+                  max: chip === 'До 25 000 ₴' ? null : applied.max,
+                })}>
+                  {chip} ×
+                </button>
+              ))}
+              {chips.length > 0 ? <button type="button" className="text-sm text-brand-700" onClick={() => setApplied(emptyFilters)}>Скинути все</button> : null}
+            </div>
+            <label className="flex items-center gap-2 text-sm text-muted">
               Сортування
-              <select
-                className="ml-2 rounded-lg border border-stone-200 bg-white px-3 py-2"
-                aria-label="Сортування"
-                value={sort}
-                onChange={(event) => writeParams({ sort: event.target.value })}
-              >
+              <select className="rounded-lg border border-line bg-white px-2 py-1 text-ink" value={sort} onChange={(event) => setSort(event.target.value)}>
                 <option value="new">Спочатку нові</option>
+                <option value="price_asc">Від дешевих до дорогих</option>
+                <option value="price_desc">Від дорогих до дешевих</option>
                 <option value="name">За назвою</option>
-                <option value="price_asc">Спочатку дешевші</option>
-                <option value="price_desc">Спочатку дорожчі</option>
               </select>
             </label>
           </div>
-          <ErrorText>{error}</ErrorText>
-          {loading ? (
-            <div className="grid min-h-64 place-items-center">
-              <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand-100 border-t-brand-700" aria-label="Завантаження" />
-            </div>
-          ) : null}
-          {!loading && page.length === 0 ? (
-            <p className="rounded-2xl bg-white p-6 text-stone-600">
-              {query || categoryId || minPrice || maxPrice || inStock ? 'Нічого не знайдено. Скиньте фільтри або змініть запит.' : 'Каталог порожній.'}
-            </p>
-          ) : null}
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {page.map((product) => (
+          {loading ? <p className="text-muted">Завантажуємо товари…</p> : null}
+          {!loading && shown.length === 0 ? <p className="rounded-2xl bg-white p-6 text-muted">Нічого не знайдено. Скиньте фільтри або змініть запит.</p> : null}
+          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {slice.map((product) => (
               <li key={product.id}>
-                <ProductCard product={product} />
-                <button
-                  type="button"
-                  className="mt-2 text-left text-xs text-muted hover:text-brand-700"
-                  onClick={() => setCompared(toggleCompare(product.id))}
-                >
-                  {compared.includes(product.id) ? 'У порівнянні' : 'Порівняти'}
-                </button>
+                <ProductCard
+                  product={product}
+                  loved={loved.includes(product.id)}
+                  onLoved={(next) => setLoved((ids) => next ? [...ids, product.id] : ids.filter((id) => id !== product.id))}
+                />
               </li>
             ))}
           </ul>
-          {!loading && visible < shown.length ? (
-            <button
-              type="button"
-              className="mt-5 w-full rounded-xl border border-brand-700 py-3 text-sm font-semibold text-brand-700 hover:bg-brand-50"
-              onClick={() => setVisible((count) => count + pageSize)}
-            >
-              Показати ще {Math.min(pageSize, shown.length - visible)} товарів
+          {visible < pageSize && slice.length > visible ? null : null}
+          {shown.length > page * pageSize || visible < Math.min(pageSize, shown.length - (page - 1) * pageSize) ? (
+            <button type="button" className="mt-6 w-full rounded-xl border border-brand-700 py-3 text-sm font-semibold text-brand-700" onClick={() => setVisible((count) => count + 4)}>
+              Показати ще
             </button>
+          ) : null}
+          {pages > 1 ? (
+            <div className="mt-4 flex justify-center gap-2">
+              {Array.from({ length: pages }, (_, index) => index + 1).map((number) => (
+                <button key={number} type="button" className={`h-9 w-9 rounded-lg text-sm ${number === page ? 'bg-brand-700 text-white' : 'bg-white'}`} onClick={() => { setPage(number); setVisible(pageSize) }}>{number}</button>
+              ))}
+            </div>
           ) : null}
         </div>
       </div>
     </section>
+  )
+}
+
+function FilterGroup({ title, options, selected, onToggle }: { title: string, options: [string, number][], selected: string[], onToggle: (value: string) => void }) {
+  if (options.length === 0)
+    return null
+  return (
+    <fieldset className="mt-4">
+      <legend className="text-sm font-medium">{title}</legend>
+      <ul className="mt-2 space-y-1">
+        {options.map(([name, count]) => (
+          <li key={name}>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" className="accent-brand-700" checked={selected.includes(name)} onChange={() => onToggle(name)} />
+              <span className="flex-1">{name}</span>
+              <span className="text-muted">{count}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </fieldset>
   )
 }
