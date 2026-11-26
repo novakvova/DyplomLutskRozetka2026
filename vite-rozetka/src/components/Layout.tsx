@@ -119,7 +119,7 @@ export function Layout() {
               <img src="/hopely/icon-search.svg" alt="" className="h-4 w-4" />
               <input
                 className="h-full w-full bg-transparent text-sm outline-none"
-                placeholder="Я шукаю…"
+                placeholder="Я шукаю..."
                 aria-label="Пошук товарів"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -149,7 +149,7 @@ export function Layout() {
           </div>
         ) : null}
       </header>
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 lg:px-10">
         <Outlet />
       </main>
       <footer className="bg-ink text-sm text-[#d9cfc3]">

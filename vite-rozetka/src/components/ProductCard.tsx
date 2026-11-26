@@ -59,7 +59,7 @@ export function ProductCard({ product, loved = false, onLoved }: { product: Prod
     <article className="relative flex h-full flex-col rounded-xl border border-line bg-white p-4 shadow-[0_4px_16px_rgba(36,37,31,0.08)]">
       <Link to={`/products/${product.id}`} className="relative block h-[180px] overflow-hidden rounded-lg bg-cream">
         {discount ? <span className="absolute left-2 top-2 rounded bg-brand-700 px-2 py-0.5 text-xs font-semibold text-white">−{discount}%</span> : null}
-        <img src={product.imageUrl || '/hopely/laptop.svg'} alt="" className={product.imageUrl?.endsWith('.svg') ? 'h-full w-full object-contain p-8' : 'h-full w-full object-cover'} />
+        <img src={product.imageUrl || '/hopely/laptop.svg'} alt="" className="h-full w-full object-contain p-4" />
       </Link>
       <button type="button" className="absolute right-6 top-6 grid h-8 w-8 place-items-center rounded-full bg-white/90" aria-label={loved ? 'Прибрати з обраного' : 'В обране'} onClick={() => void toggleFavorite()}>
         <img src="/hopely/icon-heart.svg" alt="" className={`h-4 w-4 ${loved ? '' : 'opacity-60'}`} />

@@ -165,7 +165,7 @@ export function CatalogPage() {
       </p>
       <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">{query ? `Пошук: ${query}` : category?.name ?? 'Каталог'}</h1>
+          <h1 className="text-[32px] font-bold leading-10">{query ? `Пошук: ${query}` : category?.name ?? 'Каталог'}</h1>
           <p className="text-sm text-muted">{loading ? 'Шукаємо товари' : `${shown.length} товарів`}</p>
         </div>
       </div>

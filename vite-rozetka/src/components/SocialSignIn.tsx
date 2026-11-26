@@ -33,6 +33,9 @@ export function SocialSignIn({ onGoogle }: { onGoogle: (idToken: string) => void
           Продовжити через Google
         </button>
       )}
+      <button type="button" className="flex w-full items-center justify-center gap-2 rounded-lg border border-line py-2.5 text-sm" onClick={() => setError('Вхід через Apple недоступний: немає Apple Developer Program.')}>
+        Продовжити через Apple
+      </button>
       {error && <p className="text-sm text-brand-700">{error}</p>}
     </div>
   )

@@ -55,7 +55,7 @@ export function LoginPage() {
       <SocialSignIn onGoogle={(idToken) => void onGoogle(idToken)} />
       <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-wide text-stone-400">
         <span className="h-px flex-1 bg-stone-200" />
-        або електронною поштою
+        або
         <span className="h-px flex-1 bg-stone-200" />
       </div>
       <form className="space-y-3" onSubmit={(event) => void onSubmit(event)}>
