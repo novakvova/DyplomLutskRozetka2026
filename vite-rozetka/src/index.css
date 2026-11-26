@@ -25,3 +25,18 @@ body {
 #root {
   min-height: 100vh;
 }
+
+.ornament-light,
+.ornament-brand {
+  height: 72px;
+  -webkit-mask: url(/hopely/ornament.svg) center / auto 72px repeat-x;
+  mask: url(/hopely/ornament.svg) center / auto 72px repeat-x;
+}
+
+.ornament-light {
+  background-color: #fffdf9;
+}
+
+.ornament-brand {
+  background-color: #e25420;
+}

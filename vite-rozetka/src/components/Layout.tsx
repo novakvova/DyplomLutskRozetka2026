@@ -5,6 +5,7 @@ import { api } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import type { Cart, Category } from '../types'
 import { Logo } from './Logo'
+import { Splash } from './Splash'
 
 function IconLabel({
   to,
@@ -80,6 +81,9 @@ export function Layout() {
   }
 
   const accountTo = user ? '/profile' : '/login'
+
+  if (loading)
+    return <Splash />
 
   return (
     <div className="flex min-h-screen flex-col">

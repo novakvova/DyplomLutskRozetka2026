@@ -7,6 +7,8 @@ import type { Category, Favorite, Product } from '../types'
 
 const pageSize = 8
 
+type Facet = 'game' | 'ultra' | 'study' | 'mac' | 'oled' | 'cheap' | null
+
 type Filters = {
   brands: string[]
   cpus: string[]
@@ -15,10 +17,19 @@ type Filters = {
   inStock: boolean
   min: number | null
   max: number | null
-  oled: boolean
+  facet: Facet
 }
 
-const emptyFilters: Filters = { brands: [], cpus: [], rams: [], screens: [], inStock: false, min: null, max: null, oled: false }
+const emptyFilters: Filters = { brands: [], cpus: [], rams: [], screens: [], inStock: false, min: null, max: null, facet: null }
+
+const facets: { id: Facet, label: string }[] = [
+  { id: 'game', label: 'Ігрові' },
+  { id: 'ultra', label: 'Ультрабуки' },
+  { id: 'study', label: 'Для навчання' },
+  { id: 'mac', label: 'Apple MacBook' },
+  { id: 'oled', label: 'З OLED-екраном' },
+  { id: 'cheap', label: 'До 25 000 ₴' },
+]
 
 function spec(product: Product, includes: string) {
   return product.characteristics?.find((item) => item.name.toLowerCase().includes(includes))?.value ?? ''
@@ -67,6 +78,7 @@ export function CatalogPage() {
   const [draft, setDraft] = useState<Filters>(emptyFilters)
   const [visible, setVisible] = useState(pageSize)
   const [page, setPage] = useState(1)
+  const [view, setView] = useState<'grid' | 'list'>('grid')
 
   useEffect(() => {
     api<Category[]>('/api/categories').then(setCategories).catch(() => setCategories([]))
@@ -118,7 +130,18 @@ export function CatalogPage() {
         return false
       if (applied.max !== null && product.price > applied.max)
         return false
-      if (applied.oled && !`${product.name} ${spec(product, 'екран')}`.toLowerCase().includes('oled'))
+      const haystack = `${product.name} ${product.shortDescription} ${spec(product, 'екран')}`.toLowerCase()
+      if (applied.facet === 'game' && !/tuf|legion|nitro|playstation|консол/.test(haystack))
+        return false
+      if (applied.facet === 'ultra' && !/zenbook|macbook air|slim/.test(haystack))
+        return false
+      if (applied.facet === 'study' && !/studybook|aspire|ideapad|навчан/.test(haystack))
+        return false
+      if (applied.facet === 'mac' && !haystack.includes('macbook'))
+        return false
+      if (applied.facet === 'oled' && !haystack.includes('oled'))
+        return false
+      if (applied.facet === 'cheap' && product.price > 25000)
         return false
       return true
     })
@@ -140,8 +163,7 @@ export function CatalogPage() {
     ...applied.cpus,
     ...applied.rams,
     ...applied.screens,
-    applied.oled ? 'З OLED-екраном' : '',
-    applied.max === 25000 ? 'До 25 000 ₴' : '',
+    applied.facet ? facets.find((item) => item.id === applied.facet)?.label ?? '' : '',
   ].filter(Boolean)
 
   function toggle(list: string[], value: string) {
@@ -157,24 +179,35 @@ export function CatalogPage() {
     setParams(search)
   }
 
+  const countLabel = new Intl.NumberFormat('uk-UA').format(shown.length)
+  const more = Math.max(0, shown.length - slice.length)
+
+  if (loading)
+    return <CatalogSkeleton title={category?.name} />
+
   return (
     <section>
-      <p className="text-sm text-muted">
-        <Link to="/" className="hover:text-brand-700">Головна</Link>
-        {category ? <span> · {category.name}</span> : null}
+      <p className="flex items-center gap-2 text-sm text-muted">
+        <Link to="/" className="hover:text-brand-700" aria-label="Головна">⌂</Link>
+        <span>›</span>
+        {category?.name === 'Ноутбуки' ? <Link to="/catalog" className="hover:text-brand-700">Ноутбуки та комп’ютери</Link> : <Link to="/catalog" className="hover:text-brand-700">Каталог</Link>}
+        {category ? <><span>›</span><span className="text-ink">{category.name}</span></> : null}
       </p>
-      <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-[32px] font-bold leading-10">{query ? `Пошук: ${query}` : category?.name ?? 'Каталог'}</h1>
-          <p className="text-sm text-muted">{loading ? 'Шукаємо товари' : `${shown.length} товарів`}</p>
-        </div>
+      <div className="mt-3 flex flex-wrap items-baseline gap-3">
+        <h1 className="text-[32px] font-bold leading-10">{query ? `Пошук: ${query}` : category?.name ?? 'Каталог'}</h1>
+        <p className="text-sm text-muted">{countLabel} товарів</p>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        {brands.map(([name]) => (
-          <button key={name} type="button" className="rounded-full border border-line bg-white px-3 py-1 text-sm" onClick={() => setApplied({ ...applied, brands: toggle(applied.brands, name) })}>{name}</button>
+        {facets.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            className={`rounded-full border px-3 py-1.5 text-sm ${applied.facet === item.id ? 'border-brand-700 bg-brand-50 text-brand-700' : 'border-transparent bg-white'}`}
+            onClick={() => setApplied({ ...applied, facet: applied.facet === item.id ? null : item.id })}
+          >
+            {item.label}
+          </button>
         ))}
-        <button type="button" className="rounded-full border border-line bg-white px-3 py-1 text-sm" onClick={() => setApplied({ ...applied, oled: !applied.oled })}>З OLED-екраном</button>
-        <button type="button" className="rounded-full border border-line bg-white px-3 py-1 text-sm" onClick={() => setApplied({ ...applied, max: applied.max === 25000 ? null : 25000 })}>До 25 000 ₴</button>
       </div>
       <ErrorText>{error}</ErrorText>
       <div className="mt-4 grid items-start gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
@@ -187,21 +220,27 @@ export function CatalogPage() {
             setVisible(pageSize)
           }}
         >
-          <h2 className="font-semibold">Фільтри</h2>
-          <p className="mt-4 text-sm font-medium">Ціна, ₴</p>
-          <div className="mt-2 flex gap-2">
-            <input className="w-full rounded-lg border border-line px-2 py-1 text-sm" inputMode="numeric" value={draft.min ?? floor} onChange={(event) => setDraft({ ...draft, min: Number(event.target.value) })} />
-            <input className="w-full rounded-lg border border-line px-2 py-1 text-sm" inputMode="numeric" value={draft.max ?? ceil} onChange={(event) => setDraft({ ...draft, max: Number(event.target.value) })} />
+          <h2 className="flex items-center gap-2 font-semibold">
+            <span className="text-brand-700" aria-hidden>☰</span>
+            Фільтри
+          </h2>
+          <p className="mt-4 flex items-center justify-between text-sm font-medium">Ціна, ₴ <span className="text-muted">⌄</span></p>
+          <div className="mt-2 flex items-center gap-2">
+            <input className="w-full rounded-full border border-line px-3 py-1.5 text-sm" inputMode="numeric" value={draft.min ?? floor} onChange={(event) => setDraft({ ...draft, min: Number(event.target.value) })} />
+            <span className="text-muted">—</span>
+            <input className="w-full rounded-full border border-line px-3 py-1.5 text-sm" inputMode="numeric" value={draft.max ?? ceil} onChange={(event) => setDraft({ ...draft, max: Number(event.target.value) })} />
           </div>
           <input className="mt-3 w-full accent-brand-700" type="range" min={floor} max={ceil || 1} value={draft.max ?? ceil} onChange={(event) => setDraft({ ...draft, max: Number(event.target.value) })} />
           <FilterGroup title="Бренд" options={brands} selected={draft.brands} onToggle={(value) => setDraft({ ...draft, brands: toggle(draft.brands, value) })} />
           <FilterGroup title="Діагональ екрана" options={screens} selected={draft.screens} onToggle={(value) => setDraft({ ...draft, screens: toggle(draft.screens, value) })} />
           <FilterGroup title="Процесор" options={cpus} selected={draft.cpus} onToggle={(value) => setDraft({ ...draft, cpus: toggle(draft.cpus, value) })} />
-          <FilterGroup title="Оперативна пам’ять" options={rams} selected={draft.rams} onToggle={(value) => setDraft({ ...draft, rams: toggle(draft.rams, value) })} />
-          <label className="mt-4 flex items-center justify-between text-sm">
+          <FilterGroup title="Обсяг оперативної пам’яті" options={rams} selected={draft.rams} onToggle={(value) => setDraft({ ...draft, rams: toggle(draft.rams, value) })} />
+          <div className="mt-4 flex items-center justify-between border-t border-line pt-4 text-sm">
             Тільки в наявності
-            <input type="checkbox" className="h-5 w-5 accent-brand-700" checked={draft.inStock} onChange={(event) => setDraft({ ...draft, inStock: event.target.checked })} />
-          </label>
+            <button type="button" role="switch" aria-checked={draft.inStock} className={`relative h-6 w-11 rounded-full ${draft.inStock ? 'bg-brand-700' : 'bg-[#e7e0d6]'}`} onClick={() => setDraft({ ...draft, inStock: !draft.inStock })}>
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${draft.inStock ? 'left-5' : 'left-0.5'}`} />
+            </button>
+          </div>
           <button type="submit" className="mt-4 w-full rounded-lg bg-brand-700 py-2.5 text-sm font-semibold text-white">Застосувати</button>
           <button
             type="button"
@@ -224,27 +263,27 @@ export function CatalogPage() {
                   cpus: applied.cpus.filter((item) => item !== chip),
                   rams: applied.rams.filter((item) => item !== chip),
                   screens: applied.screens.filter((item) => item !== chip),
-                  oled: chip === 'З OLED-екраном' ? false : applied.oled,
-                  max: chip === 'До 25 000 ₴' ? null : applied.max,
+                  facet: facets.some((item) => item.label === chip) ? null : applied.facet,
                 })}>
                   {chip} ×
                 </button>
               ))}
               {chips.length > 0 ? <button type="button" className="text-sm text-brand-700" onClick={() => setApplied(emptyFilters)}>Скинути все</button> : null}
             </div>
-            <label className="flex items-center gap-2 text-sm text-muted">
+            <div className="flex items-center gap-2 text-sm text-muted">
               Сортування
-              <select className="rounded-lg border border-line bg-white px-2 py-1 text-ink" value={sort} onChange={(event) => setSort(event.target.value)}>
-                <option value="new">Спочатку нові</option>
+              <select className="rounded-full border border-line bg-white px-3 py-1.5 text-ink" value={sort} onChange={(event) => setSort(event.target.value)}>
                 <option value="price_asc">Від дешевих до дорогих</option>
                 <option value="price_desc">Від дорогих до дешевих</option>
+                <option value="new">Спочатку нові</option>
                 <option value="name">За назвою</option>
               </select>
-            </label>
+              <button type="button" aria-label="Плитка" className={`grid h-9 w-9 place-items-center rounded-lg ${view === 'grid' ? 'bg-brand-50 text-brand-700' : 'bg-white'}`} onClick={() => setView('grid')}>▦</button>
+              <button type="button" aria-label="Список" className={`grid h-9 w-9 place-items-center rounded-lg ${view === 'list' ? 'bg-brand-50 text-brand-700' : 'bg-white'}`} onClick={() => setView('list')}>☰</button>
+            </div>
           </div>
-          {loading ? <p className="text-muted">Завантажуємо товари…</p> : null}
           {!loading && shown.length === 0 ? <p className="rounded-2xl bg-white p-6 text-muted">Нічого не знайдено. Скиньте фільтри або змініть запит.</p> : null}
-          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <ul className={view === 'grid' ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-4' : 'grid gap-3'}>
             {slice.map((product) => (
               <li key={product.id}>
                 <ProductCard
@@ -255,10 +294,9 @@ export function CatalogPage() {
               </li>
             ))}
           </ul>
-          {visible < pageSize && slice.length > visible ? null : null}
-          {shown.length > page * pageSize || visible < Math.min(pageSize, shown.length - (page - 1) * pageSize) ? (
-            <button type="button" className="mt-6 w-full rounded-xl border border-brand-700 py-3 text-sm font-semibold text-brand-700" onClick={() => setVisible((count) => count + 4)}>
-              Показати ще
+          {more > 0 ? (
+            <button type="button" className="mt-6 w-full rounded-xl border border-brand-700 py-3 text-sm font-semibold text-brand-700" onClick={() => setPage((current) => Math.min(pages, current + 1))}>
+              Показати ще {goods(Math.min(pageSize, more))}
             </button>
           ) : null}
           {pages > 1 ? (
@@ -274,23 +312,66 @@ export function CatalogPage() {
   )
 }
 
+function goods(count: number) {
+  const mod10 = count % 10
+  const mod100 = count % 100
+  if (mod10 === 1 && mod100 !== 11)
+    return `${count} товар`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14))
+    return `${count} товари`
+  return `${count} товарів`
+}
+
 function FilterGroup({ title, options, selected, onToggle }: { title: string, options: [string, number][], selected: string[], onToggle: (value: string) => void }) {
+  const [expanded, setExpanded] = useState(false)
   if (options.length === 0)
     return null
+  const shown = expanded ? options : options.slice(0, 6)
   return (
-    <fieldset className="mt-4">
-      <legend className="text-sm font-medium">{title}</legend>
-      <ul className="mt-2 space-y-1">
-        {options.map(([name, count]) => (
+    <fieldset className="mt-4 border-t border-line pt-4">
+      <legend className="flex w-full items-center justify-between text-sm font-medium">{title}<span className="text-muted">⌄</span></legend>
+      <ul className="mt-2 space-y-1.5">
+        {shown.map(([name, count]) => (
           <li key={name}>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" className="accent-brand-700" checked={selected.includes(name)} onChange={() => onToggle(name)} />
+              <input type="checkbox" className="h-4 w-4 accent-brand-700" checked={selected.includes(name)} onChange={() => onToggle(name)} />
               <span className="flex-1">{name}</span>
               <span className="text-muted">{count}</span>
             </label>
           </li>
         ))}
       </ul>
+      {options.length > 6 ? (
+        <button type="button" className="mt-2 text-sm font-medium text-brand-700" onClick={() => setExpanded((value) => !value)}>
+          {expanded ? 'Згорнути' : `Показати ще ${options.length - 6}`}
+        </button>
+      ) : null}
     </fieldset>
+  )
+}
+
+function CatalogSkeleton({ title }: { title?: string }) {
+  return (
+    <section>
+      <div className="h-4 w-56 animate-pulse rounded bg-cream" />
+      <h1 className="mt-3 text-[32px] font-bold leading-10">{title ?? 'Каталог'}</h1>
+      <div className="mt-4 flex gap-2">
+        {Array.from({ length: 6 }, (_, index) => <span key={index} className="h-8 w-28 animate-pulse rounded-full bg-white" />)}
+      </div>
+      <div className="mt-4 grid items-start gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="h-[560px] animate-pulse rounded-2xl bg-white" />
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 8 }, (_, index) => (
+            <li key={index} className="rounded-xl bg-white p-4">
+              <div className="h-[180px] animate-pulse rounded-lg bg-cream" />
+              <div className="mt-3 h-3 w-24 animate-pulse rounded bg-cream" />
+              <div className="mt-2 h-4 w-full animate-pulse rounded bg-cream" />
+              <div className="mt-2 h-4 w-2/3 animate-pulse rounded bg-cream" />
+              <div className="mt-4 h-6 w-24 animate-pulse rounded bg-brand-100" />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
   )
 }
