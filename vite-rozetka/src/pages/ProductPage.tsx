@@ -129,7 +129,7 @@ export function ProductPage() {
             {product.oldPrice && product.oldPrice > product.price ? (
               <span className="absolute left-3 top-3 z-10 rounded bg-brand-700 px-2 py-0.5 text-xs font-semibold text-white">−{Math.round((1 - product.price / product.oldPrice) * 100)}%</span>
             ) : null}
-            <img src={product.images[photo] ?? product.images[0]} alt={product.name} className="h-80 w-full rounded-2xl bg-cream object-contain p-6" />
+            <img src={product.images[photo] ?? product.images[0]} alt={product.name} className={`h-80 w-full rounded-2xl bg-cream ${(product.images[photo] ?? '').endsWith('.svg') ? 'object-contain p-6' : 'object-cover'}`} />
             {product.images.length > 1 ? (
               <div className="mt-2 flex gap-2">
                 {product.images.map((image, index) => (

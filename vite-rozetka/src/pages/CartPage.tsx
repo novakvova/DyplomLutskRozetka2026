@@ -78,7 +78,7 @@ export function CartPage() {
             {items.map((item) => (
               <li key={item.productId} className="flex flex-wrap items-center gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
                 <Link to={`/products/${item.productId}`} className="grid h-20 w-20 shrink-0 place-items-center rounded-lg bg-cream">
-                  <img src={item.imageUrl || '/hopely/laptop.svg'} alt="" className="h-14 w-14 object-contain" />
+                  <img src={item.imageUrl || '/hopely/laptop.svg'} alt="" className={`h-full w-full ${item.imageUrl?.endsWith('.svg') ? 'object-contain p-2' : 'object-cover'}`} />
                 </Link>
                 <div className="min-w-[180px] flex-1">
                   <Link to={`/products/${item.productId}`} className="font-medium hover:text-brand-700">{item.name}</Link>

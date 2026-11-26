@@ -34,6 +34,20 @@ const benefits = [
   ['Оплата частинами', 'До 24 платежів без переплат'],
 ]
 
+function tileImage(products: Product[], label: string) {
+  const hints: Record<string, string> = {
+    'Ноутбуки': 'ноутбук',
+    'Смартфони': 'смартфон',
+    'Телевізори': 'телевізор',
+    'Товари для геймерів': 'консоль',
+    'Енергонезалежність': 'станція',
+    'Товари для дому': 'чайник',
+  }
+  const hint = hints[label] ?? ''
+  return products.find((product) => product.name.toLowerCase().includes(hint) && product.imageUrl && !product.imageUrl.endsWith('.svg'))?.imageUrl
+    ?? '/hopely/laptop.svg'
+}
+
 function categoryHref(categories: Category[], label: string) {
   const match = categories.find((category) => category.name === label)
     ?? categories.find((category) => label.startsWith(category.name) || category.name.startsWith(label.split(' ')[0] ?? label))
@@ -112,8 +126,8 @@ export function HomePage() {
       <ul className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {tiles.map((label) => (
           <li key={label}>
-            <Link to={categoryHref(categories, label)} className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-line bg-white px-3 py-6 text-center text-sm font-medium hover:border-brand-700">
-              <img src="/hopely/laptop.svg" alt="" className="h-10 w-10" />
+            <Link to={categoryHref(categories, label)} className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-line bg-white px-3 py-5 text-center text-sm font-medium hover:border-brand-700">
+              <img src={tileImage(products, label)} alt="" className="h-16 w-16 rounded-lg object-cover" />
               {label}
             </Link>
           </li>
