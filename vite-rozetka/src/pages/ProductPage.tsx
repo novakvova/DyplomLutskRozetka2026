@@ -185,6 +185,7 @@ export function ProductPage() {
         </section>
       </div>
       <aside className="h-fit rounded-2xl bg-white p-5 shadow-sm">
+        {product.oldPrice ? <p className="text-sm text-muted line-through">{formatMoney(product.oldPrice)}</p> : null}
         <p className="text-3xl font-bold text-brand-700">{formatMoney(product.price)}</p>
         <p className={`mt-1 text-sm font-medium ${product.stock > 0 ? 'text-emerald-600' : 'text-stone-400'}`}>{product.stock > 0 ? `Є в наявності · ${product.stock} шт.` : 'Немає в наявності'}</p>
         <label className="mt-4 block text-sm font-medium text-stone-700">

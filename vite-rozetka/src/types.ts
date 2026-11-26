@@ -23,6 +23,7 @@ export type Product = {
   name: string
   shortDescription: string
   price: number
+  oldPrice: number | null
   stock: number
   averageRating: number | null
   reviewCount: number

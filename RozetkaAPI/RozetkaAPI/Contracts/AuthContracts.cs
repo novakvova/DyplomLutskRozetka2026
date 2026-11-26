@@ -23,9 +23,7 @@ public record ResetPasswordRequest(string Token, string NewPassword);
 
 public record GoogleLoginRequest(string IdToken);
 
-public record AppleLoginRequest(string IdToken, string? FirstName, string? LastName);
-
-public record AuthProvidersResponse(string GoogleClientId, string AppleClientId);
+public record AuthProvidersResponse(string GoogleClientId);
 
 public record UpdateProfileRequest(string Email, string FirstName, string LastName, string? Phone);
 

@@ -22,9 +22,9 @@ export function AuthPanel({
       <div className="flex flex-col bg-brand-700 p-7 text-white sm:p-8">
         <Logo light />
         <div className="my-8">
-          <h2 className="text-3xl font-semibold leading-tight">Вітаємо<br />в Hopely!</h2>
+          <h2 className="text-3xl font-semibold leading-tight">Вітаємо в Hopely!</h2>
           <p className="mt-4 max-w-xs text-sm leading-6 text-white/90">
-            Раді бачити вас! Увійдіть у свій обліковий запис, щоб продовжити покупки.
+            Зберігайте улюблені товари та відстежуйте свої замовлення.
           </p>
         </div>
         <Link

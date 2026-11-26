@@ -9,7 +9,7 @@ import { Button, ErrorText, Field } from '../components/Field'
 import { SocialSignIn } from '../components/SocialSignIn'
 
 export function LoginPage() {
-  const { user, login, loginWithGoogle, loginWithApple } = useAuth()
+  const { user, login, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from ?? '/'
@@ -48,24 +48,11 @@ export function LoginPage() {
     }
   }
 
-  async function onApple(idToken: string, firstName?: string, lastName?: string) {
-    setBusy(true)
-    setError('')
-    try {
-      await loginWithApple(idToken, firstName, lastName)
-      navigate(from, { replace: true })
-    } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : 'Не вдалося увійти через Apple.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
     <>
     <div className="pointer-events-none" aria-hidden><HomePage /></div>
     <AuthPanel title="Вхід" alternateTo="/register" alternateLabel="Зареєструватися" closeTo={from} overlay>
-      <SocialSignIn busy={busy} onGoogle={(idToken) => void onGoogle(idToken)} onApple={(idToken, firstName, lastName) => void onApple(idToken, firstName, lastName)} onError={setError} />
+      <SocialSignIn onGoogle={(idToken) => void onGoogle(idToken)} />
       <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-wide text-stone-400">
         <span className="h-px flex-1 bg-stone-200" />
         або електронною поштою

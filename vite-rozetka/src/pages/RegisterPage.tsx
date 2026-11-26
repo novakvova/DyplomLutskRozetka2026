@@ -9,7 +9,7 @@ import { SocialSignIn } from '../components/SocialSignIn'
 import { HomePage } from './HomePage'
 
 export function RegisterPage() {
-  const { register, loginWithGoogle, loginWithApple } = useAuth()
+  const { register, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', password: '', confirm: '', firstName: '', lastName: '', phone: '' })
   const [consent, setConsent] = useState(false)
@@ -53,10 +53,7 @@ export function RegisterPage() {
     <div className="pointer-events-none" aria-hidden><HomePage /></div>
     <AuthPanel title="Реєстрація" alternateTo="/login" alternateLabel="Увійти" overlay>
       <SocialSignIn
-        busy={busy}
-        onError={setError}
         onGoogle={(idToken) => void loginWithGoogle(idToken).then(() => navigate('/')).catch((reason: unknown) => setError(reason instanceof ApiError ? reason.message : 'Не вдалося увійти через Google.'))}
-        onApple={(idToken, firstName, lastName) => void loginWithApple(idToken, firstName, lastName).then(() => navigate('/')).catch((reason: unknown) => setError(reason instanceof ApiError ? reason.message : 'Не вдалося увійти через Apple.'))}
       />
       <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-wide text-stone-400">
         <span className="h-px flex-1 bg-stone-200" />

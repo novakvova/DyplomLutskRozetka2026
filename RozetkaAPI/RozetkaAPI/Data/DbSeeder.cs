@@ -33,6 +33,7 @@ public static class DbSeeder
         }
 
         await db.SaveChangesAsync();
+        await SeedShowcaseAsync(db);
 
         if (await db.Products.AnyAsync())
             return;
@@ -132,6 +133,74 @@ public static class DbSeeder
         ImageUrl = image,
         ManufacturerUrl = manufacturer,
         Images = [new ProductImage { Url = image, SortOrder = 0 }],
+        Characteristics = specs.Select((spec, index) => new ProductCharacteristic
+        {
+            Name = spec.Name,
+            Value = spec.Value,
+            SortOrder = index
+        }).ToList()
+    };
+
+    private static async Task SeedShowcaseAsync(AppDbContext db)
+    {
+        foreach (var name in new[]
+        {
+            "Енергонезалежність", "Ноутбуки та комп’ютери", "Смартфони, ТВ і електроніка",
+            "Товари для геймерів", "Товари для дому", "Авто і мото", "Інструменти та обладнання",
+            "Сантехніка та ремонт", "Дача, сад і город", "Спорт і захоплення", "Одяг, взуття та прикраси",
+            "Краса та здоров’я", "Дитячі товари", "Зоотовари", "Офіс, школа, книги", "Побутова хімія",
+            "Телевізори"
+        })
+        {
+            if (!await db.Categories.AnyAsync(category => category.Name == name))
+                db.Categories.Add(new Category { Name = name });
+        }
+
+        await db.SaveChangesAsync();
+        if (await db.Products.AnyAsync(product => product.Name.Contains("Vivobook 16 M1607KA")))
+            return;
+
+        var notebooks = await db.Categories.SingleAsync(category => category.Name == "Ноутбуки");
+        db.Products.AddRange(
+            Showcase(notebooks, "Ноутбук ASUS Vivobook 16 M1607KA-MB264 (90NB15F1-M00KNO) Quiet Blue", 41999, 56499, 7,
+                "16-дюймовий ноутбук для навчання і роботи. Ryzen 7, 16 ГБ пам’яті.",
+                [("Екран", "16\" IPS, 1920×1200, 60 Гц"), ("Процесор", "AMD Ryzen 7 7735HS"), ("Оперативна памʼять", "16 ГБ DDR5"), ("Накопичувач", "SSD 512 ГБ"), ("Бренд", "ASUS")]),
+            Showcase(notebooks, "Ноутбук Lenovo IdeaPad Slim 3", 27999, null, 11,
+                "15,6 дюйма, вистачає для пар і документів.",
+                [("Екран", "15,6\""), ("Процесор", "Intel Core i5"), ("Оперативна памʼять", "16 ГБ"), ("Бренд", "Lenovo")]),
+            Showcase(notebooks, "Ноутбук Acer Aspire Lite 15", 21499, 24999, 4,
+                "Легкий ноутбук для навчання.",
+                [("Екран", "15,6\""), ("Процесор", "AMD Ryzen 5"), ("Оперативна памʼять", "8 ГБ"), ("Бренд", "Acer")]),
+            Showcase(notebooks, "Ноутбук HP Pavilion 15", 31999, null, 6,
+                "Повсякденний ноутбук HP.",
+                [("Екран", "15,6\""), ("Процесор", "Intel Core i5"), ("Оперативна памʼять", "16 ГБ"), ("Бренд", "HP")]),
+            Showcase(notebooks, "Ноутбук ASUS Zenbook 14 OLED", 52999, 58999, 3,
+                "OLED-екран і тонкий корпус.",
+                [("Екран", "14\" OLED"), ("Процесор", "Intel Core i7"), ("Оперативна памʼять", "16 ГБ"), ("Бренд", "ASUS")]),
+            Showcase(notebooks, "Ноутбук Dell Inspiron 15 3530", 28499, null, 8,
+                "Робочий ноутбук Dell.",
+                [("Екран", "15,6\""), ("Процесор", "Intel Core i5"), ("Оперативна памʼять", "8 ГБ"), ("Бренд", "Dell")]));
+        await db.SaveChangesAsync();
+    }
+
+    private static Product Showcase(
+        Category category,
+        string name,
+        decimal price,
+        decimal? oldPrice,
+        int stock,
+        string summary,
+        (string Name, string Value)[] specs) => new()
+    {
+        Category = category,
+        Name = name,
+        ShortDescription = summary,
+        FullDescription = summary,
+        Price = price,
+        OldPrice = oldPrice,
+        Stock = stock,
+        ImageUrl = "/hopely/laptop.svg",
+        Images = [new ProductImage { Url = "/hopely/laptop.svg", SortOrder = 0 }],
         Characteristics = specs.Select((spec, index) => new ProductCharacteristic
         {
             Name = spec.Name,

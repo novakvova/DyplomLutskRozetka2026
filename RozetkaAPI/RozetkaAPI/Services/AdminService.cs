@@ -302,6 +302,7 @@ public class AdminService(AppDbContext db, OrderNotifier notifier)
                 product.Name,
                 product.ShortDescription,
                 product.Price,
+                product.OldPrice,
                 product.Stock,
                 null,
                 0,

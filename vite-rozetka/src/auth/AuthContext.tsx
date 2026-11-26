@@ -18,7 +18,6 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<void>
   register: (input: RegisterInput) => Promise<void>
   loginWithGoogle: (idToken: string) => Promise<void>
-  loginWithApple: (idToken: string, firstName?: string, lastName?: string) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -81,14 +80,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     storeSession(result, setUser)
   }, [])
 
-  const loginWithApple = useCallback(async (idToken: string, firstName?: string, lastName?: string) => {
-    const result = await api<AuthResponse>('/api/auth/apple', {
-      method: 'POST',
-      body: JSON.stringify({ idToken, firstName, lastName }),
-    })
-    storeSession(result, setUser)
-  }, [])
-
   const logout = useCallback(async () => {
     try {
       await api('/api/auth/logout', { method: 'POST' })
@@ -99,8 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, loading, login, register, loginWithGoogle, loginWithApple, logout, refreshUser }),
-    [user, loading, login, register, loginWithGoogle, loginWithApple, logout, refreshUser],
+    () => ({ user, loading, login, register, loginWithGoogle, logout, refreshUser }),
+    [user, loading, login, register, loginWithGoogle, logout, refreshUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
