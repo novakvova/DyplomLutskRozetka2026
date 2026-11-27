@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth/AuthContext'
+import { AccountMenu } from '../components/AccountMenu'
 import { Button, ErrorText, Field } from '../components/Field'
 import type { User } from '../types'
 
@@ -74,8 +75,10 @@ export function ProfilePage() {
   }
 
   return (
-    <section className="grid max-w-3xl gap-4 lg:grid-cols-2">
-      <form className="space-y-3 rounded-xl border border-stone-200 bg-white p-4" onSubmit={(event) => void saveProfile(event)}>
+    <section className="grid items-start gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <AccountMenu active="profile" />
+      <div className="grid gap-4 lg:grid-cols-2">
+      <form className="space-y-3 rounded-2xl bg-white p-5 shadow-sm" onSubmit={(event) => void saveProfile(event)}>
         <h1 className="text-xl font-semibold">Профіль</h1>
         <Field label="Ім’я" name="firstName" required value={profile.firstName} onChange={(event) => setProfile({ ...profile, firstName: event.target.value })} />
         <Field label="Прізвище" name="lastName" required value={profile.lastName} onChange={(event) => setProfile({ ...profile, lastName: event.target.value })} />
@@ -83,7 +86,7 @@ export function ProfilePage() {
         <Field label="Телефон" name="phone" value={profile.phone} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} />
         <Button type="submit" disabled={busy}>Зберегти</Button>
       </form>
-      <form className="space-y-3 rounded-xl border border-stone-200 bg-white p-4" onSubmit={(event) => void savePassword(event)}>
+      <form className="space-y-3 rounded-2xl bg-white p-5 shadow-sm" onSubmit={(event) => void savePassword(event)}>
         <h2 className="text-xl font-semibold">{user?.hasPassword ? 'Зміна пароля' : 'Задати пароль'}</h2>
         {user?.hasPassword ? (
           <Field label="Поточний пароль" name="currentPassword" type="password" autoComplete="current-password" required value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
@@ -96,6 +99,7 @@ export function ProfilePage() {
       <div className="lg:col-span-2">
         <ErrorText>{error}</ErrorText>
         {message ? <p className="text-sm text-brand-800">{message}</p> : null}
+      </div>
       </div>
     </section>
   )

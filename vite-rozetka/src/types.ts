@@ -23,12 +23,14 @@ export type Product = {
   name: string
   shortDescription: string
   price: number
+  oldPrice: number | null
   stock: number
   averageRating: number | null
   reviewCount: number
   categoryId: number
   categoryName: string
   imageUrl: string | null
+  characteristics: Characteristic[]
 }
 
 export type Characteristic = {
@@ -82,6 +84,8 @@ export type CartLine = {
   quantity: number
   stock: number
   lineTotal: number
+  imageUrl: string | null
+  oldPrice: number | null
 }
 
 export type Cart = {

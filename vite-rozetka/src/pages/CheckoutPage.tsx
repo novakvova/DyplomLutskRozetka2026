@@ -72,17 +72,40 @@ export function CheckoutPage() {
     }
   }
 
+  const methods = [
+    ['nova_poshta', 'Нова пошта — у відділення', 'Безкоштовно від 1 500 ₴'],
+    ['ukrposhta', 'Укрпошта', '2–4 дні'],
+    ['pickup', 'Самовивіз з магазину Hopely', 'Безкоштовно'],
+  ] as const
+  const pays = [
+    ['card', 'Карткою онлайн', 'Visa, Mastercard'],
+    ['cash_on_delivery', 'Під час отримання', 'Готівка або картка у відділенні'],
+  ] as const
+
   return (
-    <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-      <form className="space-y-3 rounded-xl border border-stone-200 bg-white p-4" onSubmit={(event) => void onSubmit(event)}>
-        <h1 className="text-2xl font-semibold">Оформлення замовлення</h1>
+    <section>
+      <p className="text-sm text-muted"><Link to="/cart" className="hover:text-brand-700">Кошик</Link> · Оформлення замовлення</p>
+      <h1 className="mt-2 text-3xl font-bold">Оформлення замовлення</h1>
+      <div className="mt-4 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <form id="checkout" className="space-y-4" onSubmit={(event) => void onSubmit(event)}>
+        <section className="rounded-2xl bg-white p-5 shadow-[0_4px_16px_rgba(36,37,31,0.06)]">
+          <h2 className="font-semibold">1. Контактні дані</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Field label="Ім’я та прізвище" name="recipientName" required value={form.recipientName} onChange={(event) => setForm({ ...form, recipientName: event.target.value })} />
         <Field label="Телефон" name="phone" required value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
-        <SelectField label="Доставка" name="deliveryMethod" value={form.deliveryMethod} onChange={(event) => setForm({ ...form, deliveryMethod: event.target.value })}>
-          <option value="nova_poshta">Нова пошта</option>
-          <option value="ukrposhta">Укрпошта</option>
-          <option value="pickup">Самовивіз</option>
-        </SelectField>
+        <p className="text-sm text-muted sm:col-span-2">Пошта: {user?.email}</p>
+          </div>
+        </section>
+        <section className="rounded-2xl bg-white p-5 shadow-[0_4px_16px_rgba(36,37,31,0.06)]">
+          <h2 className="font-semibold">2. Доставка</h2>
+          <div className="mt-3 space-y-2">
+            {methods.map(([value, title, hint]) => (
+              <label key={value} className={`flex items-center justify-between rounded-xl border px-3 py-3 text-sm ${form.deliveryMethod === value ? 'border-brand-700 bg-brand-50' : 'border-line'}`}>
+                <span><input className="mr-2 accent-brand-700" type="radio" name="deliveryMethod" checked={form.deliveryMethod === value} onChange={() => setForm({ ...form, deliveryMethod: value })} />{title}</span>
+                <span className="text-ok">{hint}</span>
+              </label>
+            ))}
+          </div>
         {form.deliveryMethod === 'nova_poshta' ? (
           <div className="space-y-2">
             <Field label="Пошук міста" name="cityQuery" value={cityQuery} onChange={(event) => setCityQuery(event.target.value)} placeholder="Наприклад, Луцьк" />
@@ -119,19 +142,32 @@ export function CheckoutPage() {
           <Field label="Місто" name="city" required value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} />
         )}
         <Field label="Відділення або адреса" name="deliveryAddress" required value={form.deliveryAddress} onChange={(event) => setForm({ ...form, deliveryAddress: event.target.value })} />
-        <SelectField label="Оплата" name="paymentMethod" value={form.paymentMethod} onChange={(event) => setForm({ ...form, paymentMethod: event.target.value })}>
-          <option value="cash_on_delivery">Під час отримання</option>
-          <option value="card">Карткою</option>
-        </SelectField>
-        {form.paymentMethod === 'card' ? (
-          <p className="text-sm text-stone-600">Оплата карткою поки не списується. Замовлення збережеться зі статусом «Очікує оплату».</p>
-        ) : null}
-        <TextArea label="Коментар" name="comment" rows={3} value={form.comment} onChange={(event) => setForm({ ...form, comment: event.target.value })} />
+        </section>
+        <section className="rounded-2xl bg-white p-5 shadow-[0_4px_16px_rgba(36,37,31,0.06)]">
+          <h2 className="font-semibold">3. Оплата</h2>
+          <div className="mt-3 space-y-2">
+            {pays.map(([value, title, hint]) => (
+              <label key={value} className={`block rounded-xl border px-3 py-3 text-sm ${form.paymentMethod === value ? 'border-brand-700 bg-brand-50' : 'border-line'}`}>
+                <input className="mr-2 accent-brand-700" type="radio" name="paymentMethod" checked={form.paymentMethod === value} onChange={() => setForm({ ...form, paymentMethod: value })} />
+                {title}
+                <span className="mt-1 block pl-5 text-muted">{hint}</span>
+              </label>
+            ))}
+          </div>
+          {form.paymentMethod === 'card' ? (
+            <p className="mt-2 text-sm text-muted">Оплата карткою відкриється на сторінці замовлення. До підтвердження статус буде «Очікує оплату».</p>
+          ) : null}
+        </section>
+        <section className="rounded-2xl bg-white p-5 shadow-[0_4px_16px_rgba(36,37,31,0.06)]">
+          <h2 className="font-semibold">4. Коментар до замовлення</h2>
+          <div className="mt-3">
+        <TextArea label="Коментар (необов’язково)" name="comment" rows={3} value={form.comment} onChange={(event) => setForm({ ...form, comment: event.target.value })} />
+          </div>
+        </section>
         <ErrorText>{error}</ErrorText>
-        <Button type="submit" disabled={busy || !cart || cart.items.length === 0}>Підтвердити замовлення</Button>
       </form>
-      <aside className="h-fit rounded-xl border border-stone-200 bg-white p-4">
-        <h2 className="font-semibold">У замовленні</h2>
+      <aside className="h-fit rounded-2xl bg-white p-5 shadow-[0_4px_16px_rgba(36,37,31,0.06)]">
+        <h2 className="font-semibold">Ваше замовлення</h2>
         {!cart ? <p className="mt-2 text-sm text-stone-600">Завантаження…</p> : null}
         {cart?.items.length === 0 ? <p className="mt-2 text-sm">Кошик порожній. <Link className="text-brand-800" to="/">До товарів</Link></p> : null}
         <ul className="mt-3 space-y-2 text-sm">
@@ -142,8 +178,10 @@ export function CheckoutPage() {
             </li>
           ))}
         </ul>
-        {cart && cart.items.length > 0 ? <p className="mt-4 font-semibold">Разом {formatMoney(cart.total)}</p> : null}
+        {cart && cart.items.length > 0 ? <p className="mt-4 text-2xl font-bold">До сплати {formatMoney(cart.total)}</p> : null}
+        <Button type="submit" form="checkout" className="mt-4 w-full" disabled={busy || !cart || cart.items.length === 0}>Підтвердити замовлення</Button>
       </aside>
+      </div>
     </section>
   )
 }

@@ -1,22 +1,42 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-50: #f3f7f4;
-  --color-brand-100: #e3f0e8;
-  --color-brand-700: #1f6b4a;
-  --color-brand-800: #174f37;
-  --color-brand-900: #123d2b;
-  --font-sans: "Segoe UI", system-ui, sans-serif;
+  --color-brand-50: #fff4ee;
+  --color-brand-100: #f8e4d8;
+  --color-brand-700: #e25420;
+  --color-brand-800: #c44718;
+  --color-brand-900: #9a3612;
+  --color-ink: #24251f;
+  --color-muted: #6b6157;
+  --color-cream: #f8f2ea;
+  --color-line: #e9dccb;
+  --color-ok: #2f8a3e;
+  --font-sans: Inter, "Segoe UI", system-ui, sans-serif;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: #f6f5f3;
-  color: #1c1917;
+  background: #fffdf9;
+  color: #24251f;
   font-family: var(--font-sans);
 }
 
 #root {
   min-height: 100vh;
+}
+
+.ornament-light,
+.ornament-brand {
+  height: 72px;
+  -webkit-mask: url(/hopely/ornament.svg) center / auto 72px repeat-x;
+  mask: url(/hopely/ornament.svg) center / auto 72px repeat-x;
+}
+
+.ornament-light {
+  background-color: #fffdf9;
+}
+
+.ornament-brand {
+  background-color: #e25420;
 }

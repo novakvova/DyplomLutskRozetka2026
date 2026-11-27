@@ -17,6 +17,9 @@ public class AuthController(AuthService auth) : ControllerBase
     public async Task<AuthResponse> Login(LoginRequest request, CancellationToken cancellationToken) =>
         await auth.LoginAsync(request, cancellationToken);
 
+    [HttpGet("providers")]
+    public AuthProvidersResponse Providers() => auth.Providers();
+
     [HttpPost("google")]
     public async Task<AuthResponse> Google(GoogleLoginRequest request, CancellationToken cancellationToken) =>
         await auth.LoginWithGoogleAsync(request, cancellationToken);

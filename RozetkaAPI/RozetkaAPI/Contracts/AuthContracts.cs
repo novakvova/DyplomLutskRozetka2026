@@ -23,6 +23,8 @@ public record ResetPasswordRequest(string Token, string NewPassword);
 
 public record GoogleLoginRequest(string IdToken);
 
+public record AuthProvidersResponse(string GoogleClientId);
+
 public record UpdateProfileRequest(string Email, string FirstName, string LastName, string? Phone);
 
 public record ChangePasswordRequest(string? CurrentPassword, string NewPassword);

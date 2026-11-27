@@ -7,12 +7,14 @@ public record ProductListItemResponse(
     string Name,
     string ShortDescription,
     decimal Price,
+    decimal? OldPrice,
     int Stock,
     double? AverageRating,
     int ReviewCount,
     int CategoryId,
     string CategoryName,
-    string? ImageUrl);
+    string? ImageUrl,
+    IReadOnlyList<CharacteristicResponse> Characteristics);
 
 public record CharacteristicResponse(string Name, string Value);
 
@@ -33,6 +35,7 @@ public record ProductDetailsResponse(
     string Name,
     string ShortDescription,
     decimal Price,
+    decimal? OldPrice,
     int Stock,
     double? AverageRating,
     int ReviewCount,
@@ -56,7 +59,9 @@ public record CartLineResponse(
     decimal UnitPrice,
     int Quantity,
     int Stock,
-    decimal LineTotal);
+    decimal LineTotal,
+    string? ImageUrl,
+    decimal? OldPrice);
 
 public record CartResponse(IReadOnlyList<CartLineResponse> Items, decimal Total);
 

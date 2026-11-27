@@ -1,0 +1,11 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="1360" height="360" viewBox="0 0 1360 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Waves" clip-path="url(#clip0_0_36)">
+<path id="Vector" d="M0 230C236.293 170 446.332 270 708.88 225C971.429 180 1128.96 160 1360 205V360H0V230Z" fill="#B83E12"/>
+<path id="Vector_2" d="M0 290C275.676 255 525.096 330 813.9 290C1102.7 250 1181.47 255 1360 280V360H0V290Z" fill="#9A3009"/>
+</g>
+<defs>
+<clipPath id="clip0_0_36">
+<rect width="1360" height="360" fill="white"/>
+</clipPath>
+</defs>
+</svg>

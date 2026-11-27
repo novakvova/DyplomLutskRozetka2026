@@ -60,6 +60,16 @@ public class BuyerApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Social_login_reports_when_provider_is_not_configured()
+    {
+        var google = await _client.PostAsJsonAsync("/api/auth/google", new { idToken = "x" });
+        Assert.Equal(HttpStatusCode.BadRequest, google.StatusCode);
+
+        var providers = await _client.GetFromJsonAsync<ProvidersBody>("/api/auth/providers");
+        Assert.Equal("", providers?.GoogleClientId);
+    }
+
+    [Fact]
     public async Task Forgot_password_returns_link_when_smtp_is_empty()
     {
         const string email = "reset@example.com";
@@ -259,6 +269,7 @@ public class BuyerApiTests : IAsyncLifetime
 
     private sealed record AuthBody(string AccessToken);
     private sealed record MessageBody(string Message, string? ResetUrl);
+    private sealed record ProvidersBody(string GoogleClientId);
     private sealed record OrderBody(int Id, string Status);
     private sealed record CartBody(List<CartLineBody> Items);
     private sealed record CartLineBody(int Quantity);
@@ -276,6 +287,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Database:ApplyMigrations", "false");
         builder.UseSetting("Database:Sqlite", $"Data Source={_databasePath}");
         builder.UseSetting("Auth:ExposeResetLink", "true");
+        builder.UseSetting("Google:ClientId", "");
         builder.UseSetting("Smtp:Host", "");
     }
 

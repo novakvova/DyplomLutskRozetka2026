@@ -3,8 +3,10 @@ import type { FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from '../api'
 import { useAuth } from '../auth/AuthContext'
+import { AuthPanel } from '../components/AuthPanel'
+import { HomePage } from './HomePage'
 import { Button, ErrorText, Field } from '../components/Field'
-import { GoogleSignIn } from '../components/GoogleSignIn'
+import { SocialSignIn } from '../components/SocialSignIn'
 
 export function LoginPage() {
   const { user, login, loginWithGoogle } = useAuth()
@@ -47,20 +49,26 @@ export function LoginPage() {
   }
 
   return (
-    <section className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-semibold">Вхід</h1>
-      <form className="space-y-3 rounded-xl border border-stone-200 bg-white p-4" onSubmit={(event) => void onSubmit(event)}>
+    <>
+    <div className="pointer-events-none" aria-hidden><HomePage /></div>
+    <AuthPanel title="Вхід" alternateTo="/register" alternateLabel="Зареєструватися" closeTo={from} overlay>
+      <SocialSignIn onGoogle={(idToken) => void onGoogle(idToken)} />
+      <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-wide text-stone-400">
+        <span className="h-px flex-1 bg-stone-200" />
+        або
+        <span className="h-px flex-1 bg-stone-200" />
+      </div>
+      <form className="space-y-3" onSubmit={(event) => void onSubmit(event)}>
         <Field label="Електронна пошта" name="email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
         <Field label="Пароль" name="password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
+        <p className="text-sm"><Link className="text-brand-700" to="/forgot-password">Забули пароль?</Link></p>
         <ErrorText>{error}</ErrorText>
-        <Button type="submit" disabled={busy}>Увійти</Button>
+        <Button type="submit" className="w-full" disabled={busy}>Увійти</Button>
       </form>
-      <GoogleSignIn onToken={(idToken) => void onGoogle(idToken)} onError={setError} />
-      <p className="text-sm"><Link className="text-brand-800" to="/forgot-password">Забули пароль?</Link></p>
-      <p className="text-sm">Немає акаунта? <Link className="text-brand-800" to="/register">Зареєструватися</Link></p>
-      <p className="rounded-lg bg-stone-100 p-3 text-sm text-stone-600">
-        Демо-покупець: buyer@rozetka.test, пароль Buyer12345. Заблокований акаунт: blocked@rozetka.test, пароль Blocked12345.
+      <p className="mt-4 rounded-xl bg-brand-50 p-3 text-sm text-stone-600">
+        Демо-покупець: buyer@rozetka.test, пароль Buyer12345. Адмін: admin@rozetka.test, пароль Admin12345.
       </p>
-    </section>
+    </AuthPanel>
+    </>
   )
 }

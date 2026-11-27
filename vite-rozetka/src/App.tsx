@@ -6,6 +6,7 @@ import { RequireAdmin } from './components/RequireAdmin'
 import { RequireAuth } from './components/RequireAuth'
 import { CartPage } from './pages/CartPage'
 import { CatalogPage } from './pages/CatalogPage'
+import { HomePage } from './pages/HomePage'
 import { CheckoutPage } from './pages/CheckoutPage'
 import { ComparePage } from './pages/ComparePage'
 import { FavoritesPage } from './pages/FavoritesPage'
@@ -30,7 +31,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
-            <Route index element={<CatalogPage />} />
+            <Route index element={<HomePage />} />
+            <Route path="catalog" element={<CatalogPage />} />
             <Route path="products/:id" element={<ProductPage />} />
             <Route path="compare" element={<ComparePage />} />
             <Route path="recent" element={<RecentPage />} />

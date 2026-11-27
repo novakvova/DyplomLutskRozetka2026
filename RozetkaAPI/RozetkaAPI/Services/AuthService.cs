@@ -114,6 +114,8 @@ public class AuthService(
         return Issue(user);
     }
 
+    public AuthProvidersResponse Providers() => new(configuration["Google:ClientId"] ?? "");
+
     public async Task<MessageResponse> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken)
     {
         const string generic = "Якщо обліковий запис існує, ми надіслали лист із посиланням для нового пароля.";

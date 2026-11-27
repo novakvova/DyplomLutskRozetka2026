@@ -58,12 +58,17 @@ public class CatalogService(AppDbContext db)
                 product.Name,
                 product.ShortDescription,
                 product.Price,
+                product.OldPrice,
                 product.Stock,
                 db.Reviews.Where(review => review.ProductId == product.Id).Average(review => (double?)review.Rating),
                 db.Reviews.Count(review => review.ProductId == product.Id),
                 product.CategoryId,
                 product.Category.Name,
-                product.ImageUrl))
+                product.ImageUrl,
+                product.Characteristics
+                    .OrderBy(item => item.SortOrder)
+                    .Select(item => new CharacteristicResponse(item.Name, item.Value))
+                    .ToList()))
             .ToListAsync(cancellationToken);
     }
 
@@ -123,6 +128,7 @@ public class CatalogService(AppDbContext db)
             product.Name,
             product.ShortDescription,
             product.Price,
+            product.OldPrice,
             product.Stock,
             reviews.Count == 0 ? null : reviews.Average(review => review.Rating),
             reviews.Count,

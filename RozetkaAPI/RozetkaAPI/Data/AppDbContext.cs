@@ -55,6 +55,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(product => product.ManufacturerUrl).HasMaxLength(300);
             entity.Property(product => product.ImageUrl).HasMaxLength(300);
             entity.Property(product => product.Price).HasPrecision(12, 2);
+            entity.Property(product => product.OldPrice).HasPrecision(12, 2);
             entity.HasOne(product => product.Category)
                 .WithMany(category => category.Products)
                 .HasForeignKey(product => product.CategoryId)
